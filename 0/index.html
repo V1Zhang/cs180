@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CS180 Proj0 · Becoming Friends with Your Camera</title>
+  <!-- 如果你的站点发布在 /cs180 子路径，打开下一行可全局修正绝对路径
+  <base href="/cs180/">
+  -->
+  <style>
+    :root{
+      /* 温柔清爽配色（取自你常用的蓝紫系） */
+      --bg: #f6f8fb;
+      --card: #ffffff;
+      --ink: #1f2937;
+      --ink-muted:#6b7280;
+      --brand-1:#93B5D4; /* 主色 */
+      --brand-2:#A1AACE; /* 辅色 */
+      --brand-3:#CEDEE4; /* 淡色底 */
+      --radius: 16px;
+      --shadow: 0 10px 30px rgba(17,24,39,.08);
+      --maxw: 1080px;
+    }
+
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);}
+
+    /* 顶部英雄区 */
+    .hero{
+      background: linear-gradient(135deg, var(--brand-3), #fff 40%, var(--brand-2) 120%);
+      padding: 56px 20px 40px;
+      border-bottom: 1px solid rgba(0,0,0,.05);
+    }
+    .hero__inner{max-width: var(--maxw); margin: 0 auto; text-align: center;}
+    .hero h1{margin: 0 0 8px; font-size: clamp(28px, 4vw, 40px); letter-spacing:.2px;}
+    .hero p{margin: 6px 0 0; color: var(--ink-muted); font-size: 16px}
+    .meta{
+      margin-top: 14px;
+      display:inline-flex; gap:10px; padding:8px 14px; border-radius:999px;
+      background: rgba(255,255,255,.6); backdrop-filter: blur(6px); border: 1px solid rgba(0,0,0,.05);
+      color: var(--ink-muted);
+    }
+
+    /* 导航锚点 */
+    .tabs{
+      margin-top: 18px;
+      display:flex; gap: 10px; justify-content: center; flex-wrap: wrap;
+    }
+    .tab{
+      display:inline-block; padding:10px 14px; border-radius: 999px; text-decoration:none; color:#0f172a;
+      background:#fff; border:1px solid rgba(0,0,0,.06);
+      transition:.2s ease; box-shadow:0 4px 12px rgba(0,0,0,.04);
+    }
+    .tab:hover{transform: translateY(-1px); box-shadow:0 8px 18px rgba(0,0,0,.08)}
+
+    /* 主体 */
+    .wrap{max-width: var(--maxw); margin: 28px auto; padding: 0 20px;}
+
+    section.card{
+      background: var(--card);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 22px;
+      margin-bottom: 26px;
+      border: 1px solid rgba(0,0,0,.06);
+    }
+    .card h2{
+      margin: 4px 0 6px;
+      font-size: clamp(22px, 3vw, 26px);
+      letter-spacing:.2px;
+    }
+    .sub{color:var(--ink-muted); margin: 0 0 16px; font-size: 14px}
+
+    /* 两列内容区 */
+    .grid{
+      display:grid; gap:16px;
+      grid-template-columns: repeat(12, minmax(0, 1fr));
+    }
+    .col-6{grid-column: span 6;}
+    .col-12{grid-column: span 12;}
+    @media (max-width: 820px){
+      .col-6{grid-column: span 12;}
+    }
+
+    figure{
+      margin:0; background:#fff; border:1px solid rgba(0,0,0,.06);
+      border-radius:12px; overflow:hidden;
+    }
+    figure img, figure video{display:block; width:100%; height:auto; cursor:zoom-in;}
+    figcaption{
+      font-size:13px; color:var(--ink-muted);
+      padding:10px 12px; background: linear-gradient(180deg,#fff, #fafafa);
+      border-top:1px solid rgba(0,0,0,.06);
+    }
+
+    .note{
+      margin-top:14px; padding:12px 14px; border-radius:12px;
+      background:linear-gradient(145deg, #fff, var(--brand-3));
+      border:1px solid rgba(0,0,0,.06); color:#334155; font-size:14px;
+    }
+
+    .footer{
+      text-align:center; color:var(--ink-muted);
+      padding: 28px 16px 40px;
+    }
+    .footer a{color:#0f172a; text-decoration:none; border-bottom:1px dashed rgba(15,23,42,.3)}
+    .footer a:hover{border-bottom-color:#0f172a}
+
+    /* 轻量灯箱（图片点击放大） */
+    .lightbox{
+      position: fixed; inset:0; background: rgba(0,0,0,.65);
+      display:none; align-items:center; justify-content:center; padding:20px; z-index: 99;
+    }
+    .lightbox.open{display:flex;}
+    .lightbox img, .lightbox video{
+      max-width: min(1200px, 92vw); max-height: 88vh; border-radius:12px; box-shadow: 0 20px 80px rgba(0,0,0,.5);
+    }
+
+    /* 小尺寸媒体类（用于缩小 GIF 显示框） */
+    .figure-narrow{ max-width: 350px; margin: 0 auto; }
+    .img-sm{ max-width: 420px; width: 100%; display: block; margin: 0 auto; }
+
+    .img-fixed {
+        width: 375px;
+        height: 500px;
+        object-fit: cover;   /* 保证填满容器，超出部分裁切 */
+        display: block;
+        margin: 0 auto;      /* 居中 */
+        border-radius: 8px;  /* 可选：加点圆角 */
+      }
+      
+
+    /* 打印优化（导出 PDF） */
+    @media print{
+      .hero, .tabs{box-shadow:none; background:#fff}
+      .tab, .meta{display:none}
+      body{background:#fff}
+      section.card{
+        box-shadow:none; border: 1px solid #ddd; page-break-inside: avoid;
+      }
+      .footer{color:#333; border-top:1px solid #ddd}
+      a[href]::after{content:" (" attr(href) ")"; font-size:12px; color:#555}
+    }
+  </style>
+</head>
+<body>
+  <header class="hero">
+    <div class="hero__inner">
+      <h1>CS180 Proj0 · Becoming Friends with Your Camera</h1>
+      <p>Exploring perspective, focal length/zoom, and the center of projection with real captures.</p>
+      <div class="meta">Sep 2, 2025 · Weiyi Zhang</div>
+
+      <nav class="tabs" aria-label="Sections">
+        <a class="tab" href="#part1">Part 1 · Selfie</a>
+        <a class="tab" href="#part2">Part 2 · Architecture</a>
+        <a class="tab" href="#part3">Part 3 · Dolly Zoom</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <!-- Part 1 -->
+    <section id="part1" class="card">
+      <h2>Part 1 · Selfie: Wrong vs. Right</h2>
+      <p class="sub">
+        Close portrait comparison: stand close vs. step back and zoom in. Keep the face roughly the same size; compare distortion.
+      </p>
+
+      <div class="grid">
+        <div class="col-6">
+            <figure>
+              <img src="./media/close_up_selfie.jpg" 
+                   alt="Close-up selfie (wide, distorted)" 
+                   data-lightbox 
+                   class="img-fixed">
+              <figcaption><strong>Close-up (Wrong Way)</strong> · 
+                Wide angle exaggerates facial features (big nose, edge stretch).
+              </figcaption>
+            </figure>
+          </div>
+          
+          <div class="col-6">
+            <figure>
+              <img src="./media/zoomed_in_selfie.jpg" 
+                   alt="Back up + zoom (more natural proportions)" 
+                   data-lightbox 
+                   class="img-fixed">
+              <figcaption><strong>Back up + Zoom (Right Way)</strong> · 
+                Longer focal length reduces perspective distortion.
+              </figcaption>
+            </figure>
+          </div>
+          
+        <div class="col-12">
+          <div class="note">
+            <strong>With greater camera-subject distance, rays are more parallel at the sensor.</strong> 
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Part 2 -->
+    <section id="part2" class="card">
+      <h2>Part 2 · Architectural Perspective Compression</h2>
+      <p class="sub">
+        Shoot a long street/path scene. First: from afar with zoom (looks flattened). Second: walk forward, no zoom (stronger depth).
+      </p>
+
+      <div class="grid">
+        <div class="col-6">
+            <figure class="figure-medium">
+              <img src="./media/zoomed_in_street.jpg" 
+                   alt="Zoomed-in distant view (compressed perspective)" 
+                   data-lightbox
+                   class="img-fixed">
+              <figcaption><strong>Zoomed from Distance</strong> · 
+                Background and foreground appear closer (compression).
+              </figcaption>
+            </figure>
+          </div>
+          
+          <div class="col-6">
+            <figure class="figure-medium">
+              <img src="./media/walked_down_street.jpg" 
+                   alt="Walked closer with wide view (strong depth cues)" 
+                   data-lightbox
+                   class="img-fixed">
+              <figcaption><strong>Walked Forward, No Zoom</strong> · 
+                Converging lines & size change amplify depth.
+              </figcaption>
+            </figure>
+          </div>
+          
+
+        <div class="col-12">
+          <div class="note">
+            <strong>Why “compression”? -- Changing the vantage point alters relative sizes of near/far objects projected onto the sensor. Zoom then selects a narrower FoV.</strong>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Part 3 -->
+    <section id="part3" class="card">
+      <h2>Part 3 · The Dolly Zoom</h2>
+      <p class="sub">
+        Move the camera backward while zooming in to keep the subject size constant; background stretches or collapses.
+      </p>
+
+      <!-- ✅ 修正：补上 .grid 容器，并缩小 GIF 显示框 -->
+      <div class="grid">
+        <div class="col-12">
+          <figure class="figure-narrow">
+            <img src="./media/dolly_zoom_animation.gif"
+                 alt="Dolly zoom animated GIF"
+                 data-lightbox
+                 class="img-sm">
+            <figcaption>Animated GIF</figcaption>
+          </figure>
+        </div>
+      </div>
+    </section>
+
+    <div class="footer">
+      Project by <a href="https://github.com/V1Zhang" target="_blank">V1Zhang</a> ·
+      Source: <a href="https://github.com/V1Zhang/cs180" target="_blank">/V1Zhang/cs180</a>
+    </div>
+  </main>
+
+  <!-- 轻量灯箱 -->
+  <div class="lightbox" id="lightbox" aria-hidden="true" role="dialog">
+    <img alt="" id="lb-img" style="display:none">
+    <video id="lb-video" style="display:none" controls></video>
+  </div>
+
+  <script>
+    // 简易灯箱逻辑：点击任何带 data-lightbox 的 img 或 GIF/视频占位图，放大预览
+    const lb = document.getElementById('lightbox');
+    const lbImg = document.getElementById('lb-img');
+    const lbVideo = document.getElementById('lb-video');
+
+    function openLightbox(el){
+      const isVideo = el.tagName.toLowerCase() === 'video' || (el.src && el.src.endsWith('.mp4'));
+      lb.classList.add('open');
+      if(isVideo){
+        lbVideo.src = el.src; lbVideo.style.display='block'; lbImg.style.display='none';
+      }else{
+        lbImg.src = el.src; lbImg.alt = el.alt || ''; lbImg.style.display='block'; lbVideo.style.display='none';
+      }
+      lb.setAttribute('aria-hidden','false');
+    }
+    function closeLightbox(){
+      lb.classList.remove('open');
+      lbImg.src=''; lbVideo.pause(); lbVideo.removeAttribute('src');
+      lb.setAttribute('aria-hidden','true');
+    }
+    document.addEventListener('click', e=>{
+      const t = e.target;
+      if(t.matches('[data-lightbox]')){ openLightbox(t); }
+      else if(t.id==='lightbox'){ closeLightbox(); }
+    });
+    document.addEventListener('keydown', e=>{
+      if(e.key==='Escape' && lb.classList.contains('open')) closeLightbox();
+    });
+  </script>
+</body>
+</html>
