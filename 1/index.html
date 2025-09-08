@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CS180 Proj1 · Colorizing the Prokudin-Gorskii Collection</title>
+  <!-- 如果站点发布在 /cs180 子路径，可开启 base -->
+  <!-- <base href="/cs180/"> -->
+  <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+  <!-- 顶部 -->
+  <header class="hero">
+    <div class="hero__inner">
+      <h1>CS180 Proj1 · Colorizing the Prokudin-Gorskii Photo Collection</h1>
+      <p>
+        Split BGR plates → align G/R to B using ZNCC on Sobel-grad features with
+        ratio-based border cropping → compose RGB. Coarse-to-fine pyramid for .tif.
+      </p>
+      <div class="meta">Sep 12, 2025 · Weiyi Zhang</div>
+
+      <nav class="tabs" aria-label="Sections">
+        <a class="tab" href="#overview">Overview</a>
+        <a class="tab" href="#methodology">Methodology</a>
+        <a class="tab" href="#results">Results</a>
+        <a class="tab" href="#extras">LoC Extras</a>
+        <a class="tab" href="#discussion">Discussion</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <!-- 概述 -->
+    <section id="overview" class="card">
+      <h2>Overview</h2>
+      <p class="sub">
+        Each input plate stacks B-G-R vertically. I split channels, then translate-align G/R to B
+        by maximizing ZNCC on Sobel gradient magnitude with interior-only comparison
+        (ratio-based border crop). For large .tif plates, a coarse-to-fine image pyramid yields
+        accurate and fast alignment.
+      </p>
+
+      <div class="grid">
+        <div class="col-6">
+          <figure>
+            <img src="./media/emir.jpg" alt="Original BGR plate" data-lightbox class="same-height">
+            <figcaption><strong>Input</strong> · BGR plate (top→bottom: B, G, R)</figcaption>
+          </figure>
+        </div>
+        <div class="col-6">
+          <figure>
+            <img src="./out/emir_color.jpg" alt="Colorized output" data-lightbox class="same-height">
+            <figcaption><strong>Output</strong> · Aligned & composed RGB</figcaption>
+          </figure>
+        </div>
+      </div>
+    </section>
+
+    <!-- 方法 -->
+    <section id="methodology" class="card">
+      <h2>Methodology</h2>
+
+      <!-- 单尺度 -->
+      <h3>Single-scale alignment (baseline, small JPGs)</h3>
+      <ol style="margin:0 0 12px 18px; line-height:1.7;">
+        <li><strong>Split</strong>: <code>split_bgr_plate()</code> slices the vertical plate into B, G, R.</li>
+        <li><strong>Feature</strong>: optionally convert to Sobel gradient magnitude (<code>feature_grad()</code> / <code>grad_mag()</code>).</li>
+        <li><strong>Interior-only metric</strong>: <code>crop_interior()</code> supports <em>pixel</em> or <em>ratio</em> borders.</li>
+        <li><strong>Search</strong>: exhaustive translations within <code>[-R, R]</code> (default ±15 px).</li>
+        <li><strong>Score</strong>: ZNCC (<code>zncc()</code>) on the cropped interior; pick the max.</li>
+        <li><strong>Compose</strong>: stack aligned <code>[R, G, B]</code> to RGB and save.</li>
+      </ol>
+      <div class="note">
+        Implementation notes: <code>crop_interior()</code> accepts <code>int</code> (pixels) or <code>float</code> (ratio);
+        ZNCC is “higher is better”.
+      </div>
+
+      <!-- 金字塔 -->
+      <h3>Coarse-to-fine pyramid (large TIFs)</h3>
+      <ol style="margin:0 0 12px 18px; line-height:1.7;">
+        <li><strong>Downsample</strong>: build pyramids from coarse → fine with factor <code>scale = 0.5</code>.</li>
+        <li><strong>Coarsest init</strong>: run local search at coarsest level using Sobel + ZNCC.</li>
+        <li><strong>Propagate</strong>: rescale offsets by ×2 at each finer level.</li>
+        <li><strong>Refine</strong>: refine with a small-radius local search.</li>
+        <li><strong>Ratio crop</strong>: use ratio borders (e.g., <code>0.08</code>).</li>
+      </ol>
+      <div class="note">
+        Key routines: <code>build_pyramid()</code>, <code>align_local_search()</code>, <code>align_pyramid()</code>.
+      </div>
+    </section>
+
+    <!-- 结果展示 -->
+    <section id="results" class="card">
+      <h2>Results (with Offsets)</h2>
+      <p class="sub">Colorized outputs with corresponding offsets (G,R relative to B).</p>
+
+      <div class="grid4">
+        <!-- Example tile -->
+        <div class="tile">
+          <img src="./out/cathedral_color.jpg" alt="cathedral" data-lightbox>
+          <figcaption>
+            <strong>cathedral.jpg</strong><br>
+            G:(+2,+5), R:(+3,+12)<br>
+            <small>single · NCC</small>
+          </figcaption>
+        </div>
+
+        <div class="tile">
+          <img src="./out/monastery_color.jpg" alt="monastery" data-lightbox>
+          <figcaption>
+            <strong>monastery.jpg</strong><br>
+            G:(+2,-3), R:(+2,+3)<br>
+            <small>single · NCC</small>
+          </figcaption>
+        </div>
+
+        <div class="tile">
+          <img src="./out/tobolsk_color.jpg" alt="tobolsk" data-lightbox>
+          <figcaption>
+            <strong>tobolsk.jpg</strong><br>
+            G:(+2,+3), R:(+3,+6)<br>
+            <small>single · NCC</small>
+          </figcaption>
+        </div>
+
+        <div class="tile">
+          <img src="./out/church_color.jpg" alt="church" data-lightbox>
+          <figcaption>
+            <strong>church.tif</strong><br>
+            G:(+4,+25), R:(-4,+58)<br>
+            <small>pyramid · edges+ZNCC</small>
+          </figcaption>
+        </div>
+
+        <div class="tile">
+          <img src="./out/emir_color.jpg" alt="emir" data-lightbox>
+          <figcaption>
+            <strong>emir.tif</strong><br>
+            G:(+23,+49), R:(+40,+107)<br>
+            <small>pyramid · edges+ZNCC</small>
+          </figcaption>
+        </div>
+
+        <div class="tile">
+          <img src="./out/harvesters_color.jpg" alt="harvesters" data-lightbox>
+          <figcaption>
+            <strong>harvesters.tif</strong><br>
+            G:(+17,+60), R:(+14,+124)<br>
+            <small>pyramid · edges+ZNCC</small>
+          </figcaption>
+        </div>
+
+        <div class="tile">
+          <img src="./out/icon_color.jpg" alt="icon" data-lightbox>
+          <figcaption>
+            <strong>icon.tif</strong><br>
+            G:(+17,+42), R:(+23,+90)<br>
+            <small>pyramid · edges+ZNCC</small>
+          </figcaption>
+        </div>
+
+        <div class="tile">
+          <img src="./out/italil_color.jpg" alt="italil" data-lightbox>
+          <figcaption>
+            <strong>italil.tif</strong><br>
+            G:(+22,+38), R:(+36,+77)<br>
+            <small>pyramid · edges+ZNCC</small>
+          </figcaption>
+        </div>
+
+        <div class="tile">
+          <img src="./out/lastochikino_color.jpg" alt="lastochikino" data-lightbox>
+          <figcaption>
+            <strong>lastochikino.tif</strong><br>
+            G:(-2,-3), R:(-8,+76)<br>
+            <small>pyramid · edges+ZNCC</small>
+          </figcaption>
+        </div>
+
+        <div class="tile">
+          <img src="./out/lugano_color.jpg" alt="lugano" data-lightbox>
+          <figcaption>
+            <strong>lugano.tif</strong><br>
+            G:(-17,+41), R:(-29,+92)<br>
+            <small>pyramid · edges+ZNCC</small>
+          </figcaption>
+        </div>
+
+        <div class="tile">
+          <img src="./out/melons_color.jpg" alt="melons" data-lightbox>
+          <figcaption>
+            <strong>melons.tif</strong><br>
+            G:(+10,+80), R:(+13,+177)<br>
+            <small>pyramid · edges+ZNCC</small>
+          </figcaption>
+        </div>
+
+        <div class="tile">
+          <img src="./out/self_portrait_color.jpg" alt="self_portrait" data-lightbox>
+          <figcaption>
+            <strong>self_portrait.tif</strong><br>
+            G:(+29,+78), R:(+37,+176)<br>
+            <small>pyramid · edges+ZNCC</small>
+          </figcaption>
+        </div>
+
+        <div class="tile">
+          <img src="./out/siren_color.jpg" alt="siren" data-lightbox>
+          <figcaption>
+            <strong>siren.tif</strong><br>
+            G:(-7,+49), R:(-24,+96)<br>
+            <small>pyramid · edges+ZNCC</small>
+          </figcaption>
+        </div>
+
+        <div class="tile">
+          <img src="./out/three_generations_color.jpg" alt="three_generations" data-lightbox>
+          <figcaption>
+            <strong>three_generations.tif</strong><br>
+            G:(+12,+54), R:(+9,+111)<br>
+            <small>pyramid · edges+ZNCC</small>
+          </figcaption>
+        </div>
+      </div>
+    </section>
+
+
+    <section id="extras" class="card">
+      <h2>LoC Extras</h2>
+      <p class="sub">
+        Additional images from the Library of Congress collection. Only colorized outputs are shown.
+        Offsets are (G,R) relative to B, format (dx, dy), right/down positive.
+      </p>
+
+      <div class="grid4">
+        <div class="tile">
+          <img src="./out/test1_color.jpg" alt="test1" data-lightbox>
+          <figcaption>
+            <strong>test1.tif</strong><br>
+            G:(+34,+56), R:(+60,+125)<br>
+            <small>pyramid · edges+ZNCC</small>
+          </figcaption>
+        </div>
+
+        <div class="tile">
+          <img src="./out/test2_color.jpg" alt="test2" data-lightbox>
+          <figcaption>
+            <strong>test2.tif</strong><br>
+            G:(+4,+63), R:(-1,+132)<br>
+            <small>pyramid · edges+ZNCC</small>
+          </figcaption>
+        </div>
+
+        <div class="tile">
+          <img src="./out/test3_color.jpg" alt="test3" data-lightbox>
+          <figcaption>
+            <strong>test3.tif</strong><br>
+            G:(-7,+15), R:(-17,+83)<br>
+            <small>pyramid · edges+ZNCC</small>
+          </figcaption>
+        </div>
+
+        <div class="tile">
+          <img src="./out/test4_color.jpg" alt="test4" data-lightbox>
+          <figcaption>
+            <strong>test4.tif</strong><br>
+            G:(+15,+41), R:(+25,+91)<br>
+            <small>pyramid · edges+ZNCC</small>
+          </figcaption>
+        </div>
+      </div>
+
+
+      <div class="note">
+        Tip: outputs are saved to <code>./out/</code> as <code>testX_color.jpg</code>.
+        Offsets filled from console logs. Input plates are intentionally omitted.
+      </div>
+    </section>
+
+
+
+    <!-- 讨论 -->
+    <section id="discussion" class="card">
+      <h2>Discussion</h2>
+      <p class="sub">Failures, lessons, runtime</p>
+      <ul style="margin:0 0 0 18px; line-height:1.7;">
+        <li>Challenging cases (e.g., strong cross-channel intensity change like <em>emir</em>); edges helped.</li>
+        <li>Runtime: &lt; 1 min per image with pyramid + vectorization.</li>
+        <li>Border cropping and interior-only metrics improved stability.</li>
+      </ul>
+    </section>
+
+    <div class="footer">
+      Project by <a href="https://github.com/V1Zhang" target="_blank">V1Zhang</a> ·
+      Source: <a href="https://github.com/V1Zhang/cs180" target="_blank">/V1Zhang/cs180</a>
+    </div>
+  </main>
+
+  <!-- 轻量灯箱 -->
+  <div class="lightbox" id="lightbox" aria-hidden="true" role="dialog">
+    <img alt="" id="lb-img" style="display:none">
+    <video id="lb-video" style="display:none" controls></video>
+  </div>
+
+  <!-- 复用的轻量灯箱脚本 -->
+  <script>
+    const lb = document.getElementById('lightbox');
+    const lbImg = document.getElementById('lb-img');
+    const lbVideo = document.getElementById('lb-video');
+
+    function openLightbox(el) {
+      const isVideo = el.tagName.toLowerCase() === 'video' || (el.src && el.src.endsWith('.mp4'));
+      lb.classList.add('open');
+
+      if (isVideo) {
+        lbVideo.src = el.src;
+        lbVideo.style.display = 'block';
+        lbImg.style.display = 'none';
+      } else {
+        lbImg.src = el.src;
+        lbImg.alt = el.alt || '';
+        lbImg.style.display = 'block';
+        lbVideo.style.display = 'none';
+      }
+      lb.setAttribute('aria-hidden', 'false');
+    }
+
+    function closeLightbox() {
+      lb.classList.remove('open');
+      lbImg.src = '';
+      lbVideo.pause();
+      lbVideo.removeAttribute('src');
+      lb.setAttribute('aria-hidden', 'true');
+    }
+
+    document.addEventListener('click', e => {
+      const t = e.target;
+      if (t.matches('[data-lightbox]')) {
+        openLightbox(t);
+      } else if (t.id === 'lightbox') {
+        closeLightbox();
+      }
+    });
+
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && lb.classList.contains('open')) {
+        closeLightbox();
+      }
+    });
+  </script>
+</body>
+</html>

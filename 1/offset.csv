@@ -1,0 +1,60 @@
+Processing cathedral.jpg ...
+[single] Best offset: dx=2, dy=5
+[single] Best offset: dx=3, dy=12
+Saved: ./out\cathedral_color.jpg
+Offsets (G,R relative to B): G(2, 5), R(3, 12)
+Processing church.tif ...
+Saved: ./out\church_color.jpg
+Offsets (G,R relative to B): G(4, 25), R(-4, 58)
+Processing emir.tif ...
+Saved: ./out\emir_color.jpg
+Offsets (G,R relative to B): G(23, 49), R(40, 107)
+Processing harvesters.tif ...
+Saved: ./out\harvesters_color.jpg
+Offsets (G,R relative to B): G(17, 60), R(14, 124)
+Processing icon.tif ...
+Saved: ./out\icon_color.jpg
+Offsets (G,R relative to B): G(17, 42), R(23, 90)
+Processing italil.tif ...
+Saved: ./out\italil_color.jpg
+Offsets (G,R relative to B): G(22, 38), R(36, 77)
+Processing lastochikino.tif ...
+Saved: ./out\lastochikino_color.jpg
+Offsets (G,R relative to B): G(-2, -3), R(-8, 76)
+Processing lugano.tif ...
+Saved: ./out\lugano_color.jpg
+Offsets (G,R relative to B): G(-17, 41), R(-29, 92)
+Processing melons.tif ...
+Saved: ./out\melons_color.jpg
+Offsets (G,R relative to B): G(10, 80), R(13, 177)
+Processing monastery.jpg ...
+[single] Best offset: dx=2, dy=-3
+[single] Best offset: dx=2, dy=3
+Saved: ./out\monastery_color.jpg
+Offsets (G,R relative to B): G(2, -3), R(2, 3)
+Processing self_portrait.tif ...
+Saved: ./out\self_portrait_color.jpg
+Offsets (G,R relative to B): G(29, 78), R(37, 176)
+Processing siren.tif ...
+Saved: ./out\siren_color.jpg
+Offsets (G,R relative to B): G(-7, 49), R(-24, 96)
+Processing test1.tif ...
+Saved: ./out\test1_color.jpg
+Offsets (G,R relative to B): G(34, 56), R(60, 125)
+Processing test2.tif ...
+Saved: ./out\test2_color.jpg
+Offsets (G,R relative to B): G(4, 63), R(-1, 132)
+Processing test3.tif ...
+Saved: ./out\test3_color.jpg
+Offsets (G,R relative to B): G(-7, 15), R(-17, 83)
+Processing test4.tif ...
+Saved: ./out\test4_color.jpg
+Offsets (G,R relative to B): G(15, 41), R(25, 91)
+Processing three_generations.tif ...
+Saved: ./out\three_generations_color.jpg
+Offsets (G,R relative to B): G(12, 54), R(9, 111)
+Processing tobolsk.jpg ...
+[single] Best offset: dx=2, dy=3
+[single] Best offset: dx=3, dy=6
+Saved: ./out\tobolsk_color.jpg
+Offsets (G,R relative to B): G(2, 3), R(3, 6)
