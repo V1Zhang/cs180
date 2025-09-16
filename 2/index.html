@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CS180 Proj2 · Fun with Filters and Frequencies</title>
+  <!-- 如果站点发布在 /cs180 子路径，可开启 base -->
+  <!-- <base href="/cs180/"> -->
+  <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+  <header class="hero">
+    <div class="hero__inner">
+      <h1>CS180 Proj2 · Fun with Filters and Frequencies</h1>
+      <p>Part 1: finite differences &amp; derivative-of-Gaussian (DoG) for edges and orientations.</p>
+      <p>Part 2: unsharp masking, hybrid images, Gaussian/Laplacian stacks, and multi-resolution blending (the “oraple”).</p>
+      <div class="meta">Sep 26, 2025 · Weiyi Zhang</div>
+
+      <nav class="tabs" aria-label="Sections">
+        <a class="tab" href="#overview">Overview</a>
+        <a class="tab" href="#part1">Part 1 · Filters</a>
+        <a class="tab" href="#part2">Part 2 · Frequencies</a>
+        <a class="tab" href="#gallery">Gallery</a>
+        <a class="tab" href="#discussion">Discussion</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <!-- overview -->
+    <section id="overview" class="card">
+      <h2>Overview</h2>
+      <p class="sub">
+        This project builds intuition for spatial filtering and frequency-domain thinking. In Part 1, I compare
+        raw finite differences vs. Gaussian-smoothed derivatives and visualize gradient orientations in HSV.
+        In Part 2, I implement unsharp masking, create hybrid images (high+low frequency fusion), construct
+        Gaussian/Laplacian stacks, and reproduce multi-resolution blending (“oraple”) with both straight and irregular masks.
+      </p>
+    </section>
+
+    <!-- Part 1 -->
+    <section id="part1" class="card">
+      <h2>Part 1 · Fun with Filters</h2>
+      <section id="part1-1" class="card">
+          <h3>1.1 · Convolutions from Scratch (NumPy-only)</h3>
+          <p class="sub">
+              Implemented 2D convolution with a <strong>4-loop</strong> naive method and a <strong>2-loop slice-based</strong> method,
+              and compared against <code>scipy.signal.convolve2d</code>. Applied a <strong>9×9 box filter</strong> on a selfie
+              (<code>myPic.jpg</code>).  
+          </p>
+
+          <!-- Row 1: one line, four tiles (uses your .grid4) -->
+          <div class="grid4">
+              <!-- Original -->
+              <figure class="tile">
+              <img src="./data/myPic.jpg" alt="Original input">
+              <figcaption><strong>Original</strong> · myPic.jpg</figcaption>
+              </figure>
+
+              <!-- 4-loop (toggle heatmap in-place) -->
+              <figure class="tile">
+              <img id="p11-img-4loop"
+                  src="./out/11/box9_4loop.jpg"
+                  alt="9×9 box - 4-loop result"
+                  data-default="./out/11/box9_4loop.jpg"
+                  data-heatmap="./out/11/diff_4loop.jpg"
+                  data-state="result">
+              <figcaption class="with-btn">
+                  <strong>4-loop</strong> · manual conv
+                  <button class="mini-btn" onclick="toggleHeatmap('p11-img-4loop', this)">Show Δ heatmap</button>
+              </figcaption>
+              </figure>
+
+              <!-- 2-loop (toggle heatmap in-place) -->
+              <figure class="tile">
+              <img id="p11-img-2loop"
+                  src="./out/11/box9_2loop.jpg"
+                  alt="9×9 box - 2-loop result"
+                  data-default="./out/11/box9_2loop.jpg"
+                  data-heatmap="./out/11/diff_2loop.jpg"
+                  data-state="result">
+              <figcaption class="with-btn">
+                  <strong>2-loop</strong> · slice-based conv
+                  <button class="mini-btn" onclick="toggleHeatmap('p11-img-2loop', this)">Show Δ heatmap</button>
+              </figcaption>
+              </figure>
+
+              <!-- SciPy -->
+              <figure class="tile">
+              <img src="./out/11/box9_scipy.jpg" alt="9×9 box - SciPy convolve2d">
+              <figcaption><strong>SciPy</strong> · <code>convolve2d</code></figcaption>
+              </figure>
+          </div>
+
+          <!-- Row 2: three code blocks side-by-side -->
+          <h3 class="mt">Code Snippets</h3>
+          <div class="code-grid-3">
+              <div class="code-card">
+              <h4>4-loop convolution</h4>
+              <pre class="code-block"><code>def conv2d_4loop(img, kernel):
+              H, W = img.shape
+              kh, kw = kernel.shape
+              pad_h, pad_w = kh // 2, kw // 2
+              k = np.flipud(np.fliplr(kernel))  # true convolution (flip kernel)
+              padded = np.pad(img, ((pad_h, pad_h), (pad_w, pad_w)), mode="constant")
+              out = np.zeros_like(img, dtype=np.float64)
+              for i in range(H):
+                  for j in range(W):
+                      acc = 0.0
+                      for u in range(kh):
+                          for v in range(kw):
+                              acc += padded[i+u, j+v] * k[u, v]
+                      out[i, j] = acc
+              return out</code></pre>
+              </div>
+
+              <div class="code-card">
+              <h4>2-loop convolution</h4>
+              <pre class="code-block"><code>def conv2d_2loop(img, kernel):
+              H, W = img.shape
+              kh, kw = kernel.shape
+              pad_h, pad_w = kh // 2, kw // 2
+              k = np.flipud(np.fliplr(kernel))
+              padded = np.pad(img, ((pad_h, pad_h), (pad_w, pad_w)), mode="constant")
+              out = np.zeros_like(img, dtype=np.float64)
+              for i in range(H):
+                  for j in range(W):
+                      region = padded[i:i+kh, j:j+kw]
+                      out[i, j] = np.sum(region * k)
+              return out</code></pre>
+              </div>
+
+              <div class="code-card">
+              <h4>SciPy + save & diffs</h4>
+              <pre class="code-block"><code># 9×9 box filter
+          box9 = np.ones((9, 9), dtype=np.float64) / 81.0
+
+          img = load_image_gray("../data/myPic.jpg")
+          out_4loop = conv2d_4loop(img, box9)
+          out_2loop = conv2d_2loop(img, box9)
+          out_scipy = convolve2d(img, box9, mode="same", boundary="fill")
+
+          # rotate 90° clockwise for display
+          plt.imsave("../out/11/box9_4loop.jpg", rot90_cw(np.clip(out_4loop, 0, 1)), cmap="gray")
+          plt.imsave("../out/11/box9_2loop.jpg", rot90_cw(np.clip(out_2loop, 0, 1)), cmap="gray")
+          plt.imsave("../out/11/box9_scipy.jpg", rot90_cw(np.clip(out_scipy, 0, 1)), cmap="gray")
+
+          # absolute-diff heatmaps vs SciPy
+          eps = 1e-12
+          diff_4 = np.abs(out_4loop - out_scipy); d4 = diff_4 / (diff_4.max() + eps)
+          diff_2 = np.abs(out_2loop - out_scipy); d2 = diff_2 / (diff_2.max() + eps)
+          plt.imsave("../out/11/diff_4loop.jpg", rot90_cw(d4), cmap="inferno")
+          plt.imsave("../out/11/diff_2loop.jpg", rot90_cw(d2), cmap="inferno")</code></pre>
+            </div>
+        </div>
+
+        <p class="note">
+          <strong>Conclusion.</strong> My 4-loop and 2-loop implementations numerically match the SciPy baseline
+              (toggle to view Δ heatmaps). The 9×9 box filter blurs the image, confirming its low-pass nature:
+              it removes high-frequency details and preserves smooth low-frequency content.
+        </p>
+    </section>
+
+    <section id="part1-2" class="card">
+      <h3>1.2 Finite Difference Operator</h3>
+      <p class="sub">
+        <code>D<sub>x</sub>=[-1,1]</code>, <code>D<sub>y</sub>=[-1;1]</code> on <em>cameraman</em>; gradient magnitude and thresholded edges (manual τ).
+      </p>
+      <div class="grid3">
+        <div class="tile">
+          <img src="./out/12/part12_input.jpg" alt="cameraman input" data-lightbox>
+          <figcaption><strong>Input</strong> · cameraman</figcaption>
+        </div>
+        <div class="tile">
+          <img src="./out/12/part12_Ix.jpg" alt="Ix finite difference" data-lightbox>
+          <figcaption><strong>I<sub>x</sub></strong> · finite diff</figcaption>
+        </div>
+        <div class="tile">
+          <img src="./out/12/part12_Iy.jpg" alt="Iy finite difference" data-lightbox>
+          <figcaption><strong>I<sub>y</sub></strong> · finite diff</figcaption>
+        </div>
+        <div class="tile">
+          <img src="./out/12/part12_grad_mag.jpg" alt="gradient magnitude" data-lightbox>
+          <figcaption><strong>|∇I|</strong> · magnitude</figcaption>
+        </div>
+        <div class="tile">
+          <img src="./out/12/part12_edges_manual.jpg" alt="edges manual threshold" data-lightbox>
+          <figcaption><strong>Edges</strong> · manual τ</figcaption>
+        </div>
+        <!-- Optional: only show if you saved Otsu -->
+        <div class="tile">
+          <img src="./out/12/part12_edges_otsu.jpg" alt="edges otsu threshold" data-lightbox
+               onerror="this.parentElement.style.display='none'">
+          <figcaption><strong>Edges</strong> · Otsu τ</figcaption>
+        </div>
+      </div>
+    </section>
+
+    <section id="part1-3" class="card">
+      <h3>1.3 Derivative of Gaussian (DoG)</h3>
+      <p class="sub">
+      Gaussian pre-smoothing reduces noise. DoG (Gaussian ⊗ D) produces smoother edges than raw finite differences,
+      and matches the two-stage blur→difference pipeline in one pass.
+      </p>
+
+      <figure>
+      <img src="./out/13/cam_dog_cmp.jpg" alt="DoG vs finite diff comparison" data-lightbox
+          onerror="this.parentElement.style.display='none'">
+      </figure>
+
+      <div class="note">
+      <strong>Observation</strong> · DoG suppresses noise while keeping edges consistent with the finite-difference method.
+      </div>
+    </section>
+
+  </section>
+
+  <!-- Part 2 -->
+  <section id="part2" class="card">
+    <h2>Part 2 · Fun with Frequencies</h2>
+    <section id="part2-1" class="card">
+        <h3>2.1 Image “Sharpening” (Unsharp Mask)</h3>
+        <p class="sub">
+          Low-pass with Gaussian → subtract to get high-freq → add scaled high-freq (<em>α</em>) back.
+          Also: blur a sharp image then try to “restore” via unsharp; discuss what cannot be recovered.
+        </p>
+        <div class="grid">
+          <div class="col-6">
+            <figure>
+              <img src="./data/taj.jpg" alt="taj input" data-lightbox>
+              <figcaption><strong>taj</strong> · input</figcaption>
+            </figure>
+          </div>
+          <div class="col-6">
+            <figure>
+              <img src="./out/21/taj_sharp.jpg" alt="taj sharpened" data-lightbox>
+              <figcaption><strong>taj</strong> · unsharp result</figcaption>
+            </figure>
+          </div>
+        </div>
+
+        <figure>
+          <img src="./out/21/sharp_blur_sharpen_cmp.jpg" alt="Blur→Sharpen evaluation" data-lightbox
+              onerror="this.parentElement.style.display='none'">
+          <figcaption><strong>Evaluation</strong> · Original vs Blurred vs Restored</figcaption>
+        </figure>
+        <div class="note">
+          <strong>Observation</strong> · Unsharp masking can enhance edges and details, but cannot fully restore lost information from blurring.
+          Over-sharpening (high <em>α</em>) may introduce artifacts like ringing.
+        </div>
+      </section>
+
+      <section id="part2-2" class="card">
+          <h3>2.2 Hybrid Images</h3>
+          <p class="sub">
+            Align two images; low-pass one, high-pass the other; add. Show log-magnitude FFTs of inputs,
+            filtered, and hybrid. Include 2–3 creative pairs; experiment with color vs grayscale.
+          </p>
+
+          <div class="media-block">
+            <!-- 视频 -->
+            <div class="video-wrap">
+              <video class="hyb-video" controls playsinline preload="metadata" poster="./media/hybrid_poster.jpg">
+                <source src="./out/22/hybrid_demo.mov" type="video/mp4" />
+                Your browser does not support the video tag.
+              </video>
+              <figcaption><strong>Demo</strong> · Alignment + filtering preview</figcaption>
+            </div>
+            <div class="pairs"></div>
+            <!-- Hybrid A -->
+<div class="pair" style="display: flex; gap: 32px; align-items: flex-start;">
+  <div class="pair-left" style="display: flex; flex-direction: column; gap: 12px;">
+    <figure class="tile small">
+      <img src="./data/tree_winter.jpg" alt="Hybrid A - input 1" data-lightbox class="hyb-small">
+      <figcaption>Hybrid A · input 1</figcaption>
+    </figure>
+    <figure class="tile small">
+      <img src="./data/tree_summer.jpg" alt="Hybrid A - input 2" data-lightbox class="hyb-small">
+      <figcaption>Hybrid A · input 2</figcaption>
+    </figure>
+  </div>
+  <div class="pair-right">
+    <figure class="tile large">
+      <img src="./out/22/hybrid_tree.jpg" alt="Hybrid A - result" data-lightbox class="hyb-large">
+      <figcaption><strong>Hybrid A</strong> · result</figcaption>
+    </figure>
+  </div>
+</div>
+
+<!-- Hybrid B -->
+<div class="pair" style="display: flex; gap: 32px; align-items: flex-start;">
+  <div class="pair-left" style="display: flex; flex-direction: column; gap: 12px;">
+    <figure class="tile small">
+      <img src="./data/monkey.jpg" alt="Hybrid B - input 1" data-lightbox class="hyb-small">
+      <figcaption>Hybrid B · input 1</figcaption>
+    </figure>
+    <figure class="tile small">
+      <img src="./data/me.jpg" alt="Hybrid B - input 2" data-lightbox class="hyb-small">
+      <figcaption>Hybrid B · input 2</figcaption>
+    </figure>
+  </div>
+  <div class="pair-right">
+    <figure class="tile large">
+      <img src="./out/22/hybrid_face.jpg" alt="Hybrid B - result" data-lightbox class="hyb-large">
+      <figcaption><strong>Hybrid B</strong> · result</figcaption>
+    </figure>
+  </div>
+</div>
+
+        <div class="note">
+          <strong>Observation</strong> · Hybrid images effectively combine low and high-frequency content from two sources,
+          creating images that change perception based on viewing distance. Proper alignment and frequency cutoff choices are crucial for a convincing effect.
+        </div>
+      </section>
+
+
+
+      <section id="part2-3" class="card">
+        <h3>2.3 Gaussian &amp; Laplacian Stacks</h3>
+        <p class="sub">
+          Same-size stacks (no downsampling): Gaussian at increasing σ; Laplacian as difference of adjacent Gaussian levels + coarsest residual.
+          Visualize per level to inspect band-limited content.
+        </p>
+        <div>
+          <figure>
+            <img src="./out/23/panel_lap_apple.jpg" alt="Apple Gaussian stack" data-lightbox>
+            <figcaption><strong>Apple</strong> · Gaussian stack</figcaption>
+          </figure>
+        </div>
+        <div>
+          <figure>
+            <img src="./out/23/panel_gauss_apple.jpg" alt="Apple Laplacian stack" data-lightbox>
+            <figcaption><strong>Apple</strong> · Laplacian stack</figcaption>
+          </figure>
+        </div>
+        <div class="note">
+          <strong>Observation</strong> · The Gaussian stack progressively blurs the image, isolating lower frequency content at higher levels.
+          The Laplacian stack captures band-pass details, with each level highlighting features at specific frequency ranges.
+        </div>
+      </section>
+
+      <h3>2.4 Multi-resolution Blending (Oraple)</h3>
+      <p class="sub">
+        Build Laplacian stacks for A/B and a Gaussian mask stack; blend per level
+        <code>F<sub>i</sub> = M<sub>i</sub>·L<sup>A</sup><sub>i</sub> + (1−M<sub>i</sub>)·L<sup>B</sup><sub>i</sub></code>; reconstruct by summing levels (stack variant).
+        Show straight seam and irregular masks; include level visualizations like Fig. 10.
+      </p>
+
+      <div>
+        <figure>
+          <img src="./out/24/oraple_lap_panel.jpg" alt="Oraple vertical blend" data-lightbox>
+          <figcaption><strong>Oraple</strong> · vertical blend</figcaption>
+        </figure>
+      </div>
+      <div>
+        <figure>
+          <img src="./out/24/oraple_mask_stack.jpg" alt="Oraple irregular blend" data-lightbox>
+          <figcaption><strong>Oraple</strong> · irregular blend</figcaption>
+        </figure>
+      </div>
+      <div>
+        <figure>
+          <img src="./out/24/oraple_vertical.jpg" alt="Oraple irregular blend" data-lightbox class="img-sm">
+          <figcaption><strong>Oraple</strong> · irregular blend</figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section id="discussion" class="card">
+      <h2>Discussion</h2>
+      <p class="sub">Observations, failures, parameters, runtime</p>
+      <ul>
+        <li>DoG substantially suppresses noise vs. raw finite differences; orientation-HSV makes edge flow intuitive.</li>
+        <li>Unsharp exaggerates ringing if α or σ is too large; true lost detail (from blur) cannot be fully restored.</li>
+        <li>Hybrid images depend critically on alignment and cutoff choices (σ<sub>low</sub>, σ<sub>high</sub>).</li>
+        <li>Stack blending with a Gaussian mask stack removes seams; irregular masks produce more natural composites.</li>
+        <li>Runtime is fast with vectorized <code>convolve2d</code>; stack levels (no downsampling) simplify visualization.</li>
+      </ul>
+
+    </section>
+
+    <div class="footer">
+      Project by <a href="https://github.com/V1Zhang" target="_blank">V1Zhang</a> ·
+      Source: <a href="https://github.com/V1Zhang/cs180" target="_blank">/V1Zhang/cs180</a>
+    </div>
+  </main>
+
+  <!-- 轻量灯箱 -->
+  <div class="lightbox" id="lightbox" aria-hidden="true" role="dialog">
+    <img alt="" id="lb-img">
+    <video id="lb-video" controls></video>
+  </div>
+
+  <!-- 复用的轻量灯箱脚本 -->
+  <script>
+    const lb = document.getElementById('lightbox');
+    const lbImg = document.getElementById('lb-img');
+    const lbVideo = document.getElementById('lb-video');
+    
+   // In-place toggle between result and heatmap
+  function toggleHeatmap(imgId, btn) {
+    const img = document.getElementById(imgId);
+    const state = img.getAttribute('data-state');
+    const defSrc = img.getAttribute('data-default');
+    const hmSrc  = img.getAttribute('data-heatmap');
+    if (state === 'result') {
+      img.src = hmSrc;
+      img.setAttribute('data-state', 'heatmap');
+      btn.textContent = 'Show result image';
+    } else {
+      img.src = defSrc;
+      img.setAttribute('data-state', 'result');
+      btn.textContent = 'Show Δ heatmap';
+    }
+  }
+    function openLightbox(el) {
+      const isVideo = el.tagName.toLowerCase() === 'video' || (el.src && el.src.endsWith('.mp4'));
+      lb.classList.add('open');
+
+      if (isVideo) {
+        lbVideo.src = el.src;
+        lbVideo.style.display = 'block';
+        lbImg.style.display = 'none';
+      } else {
+        lbImg.src = el.src;
+        lbImg.alt = el.alt || '';
+        lbImg.style.display = 'block';
+        lbVideo.style.display = 'none';
+      }
+      lb.setAttribute('aria-hidden', 'false');
+    }
+
+    function closeLightbox() {
+      lb.classList.remove('open');
+      lbImg.src = '';
+      lbVideo.pause();
+      lbVideo.removeAttribute('src');
+      lb.setAttribute('aria-hidden', 'true');
+    }
+
+    document.addEventListener('click', e => {
+      const t = e.target;
+      if (t.matches('[data-lightbox]')) {
+        openLightbox(t);
+      } else if (t.id === 'lightbox') {
+        closeLightbox();
+      }
+    });
+
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && lb.classList.contains('open')) {
+        closeLightbox();
+      }
+    });
+
+
+  </script>
+</body>
+</html>
