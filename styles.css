@@ -122,6 +122,12 @@ figcaption{
   gap: 16px;
 }
 
+.grid5 {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 16px;
+}
+
 .tile {
   background: #fff;
   border: 1px solid rgba(0,0,0,.08);

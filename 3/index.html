@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CS180/280A · Proj3A · Image Warping & Mosaicing (Part A)</title>
+  <link rel="stylesheet" href="../styles.css">
+  <style>
+    /* minimal extras */
+    .kv { display:grid; grid-template-columns:auto 1fr; gap:.25rem .75rem; }
+    .kv b{white-space:nowrap}
+    .grid2 { display:grid; gap:1rem; grid-template-columns: 1fr 1fr; }
+    .img-sm { max-width: 960px }
+    .note { background:#f7f9ff; border:1px solid #dfe7ff; padding:.75rem; border-radius:.5rem; }
+    .warn { background:#fff6e5; border:1px solid #ffd79f; padding:.75rem; border-radius:.5rem; }
+    .code { background:#0b1020; color:#e6e6e6; padding:1rem; border-radius:.5rem; overflow:auto; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    table.csv { border-collapse: collapse; width:100%; font-variant-numeric: tabular-nums; }
+    table.csv th, table.csv td { border:1px solid #e6e6e6; padding:.4rem .5rem; text-align:right }
+    table.csv th { background:#f7f7f9; text-align:center }
+    .tabs .tab.is-disabled { opacity:.45; pointer-events:none; }
+  </style>
+</head>
+<body>
+  <header class="hero">
+    <div class="hero__inner">
+      <h1>CS180 Proj3 · Stitching Photo Mosaics</h1>
+      <p>A: Homography (A2), inverse warping &amp; rectification (A3), feather-blended mosaics (A4).</p>
+      <div class="meta">Oct 3, 2025 · Weiyi Zhang</div>
+
+      <nav class="tabs" aria-label="Sections">
+        <a class="tab" href="#overview">Overview</a>
+        <a class="tab" href="#a2">A2 · Homographies</a>
+        <a class="tab" href="#a3">A3 · Warp &amp; Rectify</a>
+        <a class="tab" href="#a4">A4 · Mosaics</a>
+        <a class="tab is-disabled" href="#b" aria-disabled="true" title="Coming soon">B (coming soon)</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <!-- Overview -->
+    <section id="overview" class="card">
+      <h2>Overview</h2>
+      <p class="sub">
+        A: point picking UIs, normalized DLT homography recovery, inverse warping (nearest &amp; bilinear),
+        rectification to a canonical rectangle, and multi-image feathered blending for panoramas.
+      </p>
+    </section>
+
+   
+    <section id="a" class="card">
+      <h2>A · IMAGE WARPING and MOSAICING</h2>
+      <section id="a1" class="card">
+        <h2>A.1 · Shoot and Digitize Pictures</h2>
+        <p class="sub">
+          I captured multiple photographs with overlapping views. These images will be used in the later parts
+          for homography estimation, rectification, and mosaicing.
+        </p>
+
+        <!-- Set 1: two side-by-side -->
+        <h3>Set 1 · indoor example</h3>
+        <div class="grid2">
+          <figure class="tile">
+            <img src="./a/data/raw/indoor_example/1.jpg" alt="Set1 Image 1" data-lightbox>
+            <figcaption><strong>Set1 · Image 1</strong></figcaption>
+          </figure>
+          <figure class="tile">
+            <img src="./a/data/raw/indoor_example/2.jpg" alt="Set1 Image 2" data-lightbox>
+            <figcaption><strong>Set1 · Image 2</strong></figcaption>
+          </figure>
+        </div>
+
+        <!-- Set 2: five in one row -->
+        <h3>Set 2 · outdoor example</h3>
+        <div class="grid5">
+          <figure class="tile">
+            <img src="./a/data/raw/outdoor_example/1.jpg" alt="Set2 Image 1" data-lightbox>
+            <figcaption><strong>Set2 · Image 1</strong></figcaption>
+          </figure>
+          <figure class="tile">
+            <img src="./a/data/raw/outdoor_example/2.jpg" alt="Set2 Image 2" data-lightbox>
+            <figcaption><strong>Set2 · Image 2</strong></figcaption>
+          </figure>
+          <figure class="tile">
+            <img src="./a/data/raw/outdoor_example/3.jpg" alt="Set2 Image 3" data-lightbox>
+            <figcaption><strong>Set2 · Image 3</strong></figcaption>
+          </figure>
+          <figure class="tile">
+            <img src="./a/data/raw/outdoor_example/4.jpg" alt="Set2 Image 4" data-lightbox>
+            <figcaption><strong>Set2 · Image 4</strong></figcaption>
+          </figure>
+          <figure class="tile">
+            <img src="./a/data/raw/outdoor_example/5.jpg" alt="Set2 Image 5" data-lightbox>
+            <figcaption><strong>Set2 · Image 5</strong></figcaption>
+          </figure>
+        </div>
+      </section>
+
+
+
+
+      <!-- A2 -->
+      <section id="a2" class="card">
+        <h3>A2 · Recover Homographies</h3>
+        <p class="sub">Manual correspondences → DLT &amp; normalized DLT → reprojection errors.</p>
+
+        <h4>Correspondence Visualization</h4>
+        <figure class="tile">
+          <img src="./a/results/a2/outdoor_example/corr_a.png" alt="A2 correspondences" data-lightbox class="img-sm">
+          <figcaption><strong>Clicked correspondences</strong></figcaption>
+        </figure>
+
+        <h3>DLT Linear System</h3>
+        <p>
+          Each correspondence (x,y) → (x′,y′) contributes two rows in the matrix <em>A</em>:
+        </p>
+        <pre class="code-block"><code>
+        [-x  -y  -1   0   0   0   x·x′   y·x′   x′]
+        [ 0   0   0  -x  -y  -1   x·y′   y·y′   y′]
+        </code></pre>
+        <p>
+          These stacked rows form a 2N×9 system <em>A·h=0</em>, solved by SVD to obtain the homography vector h.
+        </p>
+
+        <!-- 3. Homography Matrix -->
+        <h3>Recovered Homography H</h3>
+        <pre class="code-block"><code>
+          0.450826  -0.032532  1687.801036
+          -0.196410   0.802739   252.621928
+          -0.000130  -0.000011     1.000000
+          </code></pre>
+        <h3>Reprojection Errors</h3>
+        <p>
+          Applying H to im1_pts and comparing against ground truth im2_pts, I measured per-point reprojection errors:
+        </p>
+        <pre class="code-block small"><code>
+          x1,y1         x2,y2          pred_x2,pred_y2   error_px
+      393.41,916.92   1957.90,965.23    1955.11,970.88    6.30
+      478.88,1024.69  2024.79,1058.13   2018.84,1059.01   6.01
+      300.51,1151.04  1887.29,1177.05   1883.50,1178.70   4.14
+      ... (etc) ...
+        </code></pre>
+        <p><strong>RMSE:</strong> 7.3651 px</p>
+      </section>
+
+      <!-- A3 -->
+      <section id="a3" class="card">
+        <h2>A3 · Warp the Images &amp; Rectification</h2>
+        <p class="sub">Inverse warping with NN/Bilinear, rectifying a planar quadrilateral to a canonical rectangle.</p>
+
+        <h3>Example 1 · iPad Cover Rectification</h3>
+        <div class="grid3">
+          <figure class="tile">
+            <img src="./a/data/raw/iPad.jpg" alt="Input poster">
+            <figcaption><strong>Original</strong> · Input image</figcaption>
+          </figure>
+          <figure class="tile">
+            <img src="./a/results/a3/example1/iPad_rectified_nn.png" alt="Poster rectified NN">
+            <figcaption><strong>Nearest Neighbor</strong> · Rectified</figcaption>
+          </figure>
+          <figure class="tile">
+            <img src="./a/results/a3/example1/iPad_rectified_bil.png" alt="Poster rectified Bilinear">
+            <figcaption><strong>Bilinear</strong> · Rectified</figcaption>
+          </figure>
+        </div>
+
+        <!-- Example 2 -->
+        <h3>Example 2 · Poster Rectification</h3>
+        <div class="grid3">
+          <figure class="tile">
+            <img src="./a/data/raw/poster.jpg" alt="Input book cover">
+            <figcaption><strong>Original</strong> · Input image</figcaption>
+          </figure>
+          <figure class="tile">
+            <img src="./a/results/a3/example2/poster_rectified_nn.png" alt="Book rectified NN">
+            <figcaption><strong>Nearest Neighbor</strong> · Rectified</figcaption>
+          </figure>
+          <figure class="tile">
+            <img src="./a/results/a3/example2/poster_rectified_bil.png" alt="Book rectified Bilinear">
+            <figcaption><strong>Bilinear</strong> · Rectified</figcaption>
+          </figure>
+        </div>
+
+        <!-- Discussion -->
+        <div class="note">
+          <strong>Observation.</strong>
+          Nearest Neighbor preserves edges but causes jagged artifacts.
+          Bilinear produces smoother results, though with slight blurring.
+          Overall, bilinear is preferred for natural-looking rectification.
+        </div>
+      </section>
+
+
+      <!-- A4 -->
+      <section id="a4" class="card">
+        <h2>A4 · Blend Images into a Mosaic</h2>
+        <p class="sub">Warp each image to a global canvas and feather-blend using soft alpha from EDT.</p>
+
+        <div class="grid2">
+          <figure class="tile">
+            <img src="./a/results/a4/set1/mosaic.png" alt="Set1 Image 1" data-lightbox>
+            <figcaption><strong>indoor example</strong></figcaption>
+          </figure>
+          <figure class="tile">
+            <img src="./a/results/a4/set2/mosaic.png" alt="Set1 Image 2" data-lightbox>
+            <figcaption><strong>outdoor example </strong></figcaption>
+          </figure>
+        </div>
+
+        <figure class="tile">
+          <img src="./a/results/a4/set_full_ref2/mosaic.png" alt="Feather blended mosaic" data-lightbox class="img-sm">
+          <figcaption>five pic example</figcaption>
+        </figure>
+
+        <div class="warn">
+          <strong>Homography direction:</strong> A4 expects <em>H: img<sub>i</sub> → reference</em>.  
+          If your saved H is <em>ref → img<sub>i</sub></em>, pass it as <code>inv:path.npy</code> (loader will invert).
+        </div>
+      </section>
+    </section>
+
+    <!-- B placeholder -->
+    <section id="b" class="card">
+      <h2>Part B (coming soon)</h2>
+      <p class="sub">This section is reserved for Proj3B deliverables and will be added later.</p>
+    </section>
+
+    <div class="footer">
+      by <a href="https://github.com/V1Zhang" target="_blank">V1Zhang</a>
+    </div>
+  </main>
+
+  <!-- Lightbox -->
+  <div class="lightbox" id="lightbox" aria-hidden="true" role="dialog">
+    <img alt="" id="lb-img">
+    <video id="lb-video" controls></video>
+  </div>
+
+  <script>
+    // --- CSV renderer: render same-origin CSV to table; fallback to link on error ---
+    async function renderCSV(container) {
+      const url = container.getAttribute('data-csv');
+      const caption = container.getAttribute('data-caption') || '';
+      if (!url) return;
+      try {
+        const txt = await fetch(url, {cache:'no-store'}).then(r => r.text());
+        const lines = txt.trim().split(/\r?\n/).filter(l => !l.startsWith('#'));
+        if (!lines.length) throw new Error('empty');
+        const rows = lines.map(l => l.split(',').map(s => s.trim()));
+        const table = document.createElement('table'); table.className = 'csv';
+        if (caption) {
+          const cap = document.createElement('div');
+          cap.style.margin = '.25rem 0 .5rem';
+          cap.innerHTML = '<strong>'+caption+'</strong>';
+          container.appendChild(cap);
+        }
+        rows.forEach((r,i) => {
+          const tr = document.createElement('tr');
+          r.forEach((v,j) => {
+            const cell = document.createElement(i===0 && r.length>1 ? 'th':'td');
+            cell.textContent = v; tr.appendChild(cell);
+          });
+          table.appendChild(tr);
+        });
+        container.appendChild(table);
+      } catch(e) {
+        const a = document.createElement('a'); a.href = url; a.textContent = 'Open CSV'; container.appendChild(a);
+      }
+    }
+    document.querySelectorAll('[data-csv]').forEach(renderCSV);
+
+    // --- Lightbox ---
+    const lb = document.getElementById('lightbox');
+    const lbImg = document.getElementById('lb-img');
+    const lbVideo = document.getElementById('lb-video');
+
+    function openLightbox(el) {
+      const isVideo = el.tagName.toLowerCase()==='video' || (el.src && el.src.endsWith('.mp4'));
+      lb.classList.add('open');
+      if (isVideo) {
+        lbVideo.src = el.currentSrc || el.src;
+        lbVideo.style.display = 'block';
+        lbImg.style.display = 'none';
+      } else {
+        lbImg.src = el.src; lbImg.alt = el.alt || '';
+        lbImg.style.display = 'block';
+        lbVideo.style.display = 'none';
+      }
+      lb.setAttribute('aria-hidden','false');
+    }
+    function closeLightbox(){
+      lb.classList.remove('open');
+      lbImg.src=''; lbVideo.pause(); lbVideo.removeAttribute('src');
+      lb.setAttribute('aria-hidden','true');
+    }
+    document.addEventListener('click', e => {
+      const t = e.target;
+      if (t.matches('[data-lightbox]')) openLightbox(t);
+      else if (t.id === 'lightbox') closeLightbox();
+    });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape' && lb.classList.contains('open')) closeLightbox(); });
+  </script>
+</body>
+</html>
