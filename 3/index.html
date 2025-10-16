@@ -26,33 +26,27 @@
     <div class="hero__inner">
       <h1>CS180 Proj3 · Stitching Photo Mosaics</h1>
       <p>A: Homography (A2), inverse warping &amp; rectification (A3), feather-blended mosaics (A4).</p>
-      <div class="meta">Oct 3, 2025 · Weiyi Zhang</div>
+      <p>B: Harris–ANMS corners (B1), normalized patch descriptors (B2), Lowe-ratio matching (B3), and RANSAC-based autostitching (B4).</p>
+      <div class="meta">Oct 15, 2025 · Weiyi Zhang</div>
 
       <nav class="tabs" aria-label="Sections">
-        <a class="tab" href="#overview">Overview</a>
         <a class="tab" href="#a2">A2 · Homographies</a>
         <a class="tab" href="#a3">A3 · Warp &amp; Rectify</a>
         <a class="tab" href="#a4">A4 · Mosaics</a>
-        <a class="tab is-disabled" href="#b" aria-disabled="true" title="Coming soon">B (coming soon)</a>
+        <a class="tab" href="#b1">B1 · Harris Corner Detection</a>
+        <a class="tab" href="#b2">B2 · Feature Descriptor Extraction</a>
+        <a class="tab" href="#b3">B3 · Feature Matching</a>
+        <a class="tab" href="#b4">B4 · RANSAC for Robust Homography</a>
       </nav>
-    </div>
+    </div>`
   </header>
 
   <main class="wrap">
-    <!-- Overview -->
-    <section id="overview" class="card">
-      <h2>Overview</h2>
-      <p class="sub">
-        A: point picking UIs, normalized DLT homography recovery, inverse warping (nearest &amp; bilinear),
-        rectification to a canonical rectangle, and multi-image feathered blending for panoramas.
-      </p>
-    </section>
-
-   
+    <!-- A -->
     <section id="a" class="card">
       <h2>A · IMAGE WARPING and MOSAICING</h2>
       <section id="a1" class="card">
-        <h2>A.1 · Shoot and Digitize Pictures</h2>
+        <h3>A1 · Shoot and Digitize Pictures</h3>
         <p class="sub">
           I captured multiple photographs with overlapping views. These images will be used in the later parts
           for homography estimation, rectification, and mosaicing.
@@ -146,7 +140,7 @@
 
       <!-- A3 -->
       <section id="a3" class="card">
-        <h2>A3 · Warp the Images &amp; Rectification</h2>
+        <h3>A3 · Warp the Images &amp; Rectification</h3>
         <p class="sub">Inverse warping with NN/Bilinear, rectifying a planar quadrilateral to a canonical rectangle.</p>
 
         <h3>Example 1 · iPad Cover Rectification</h3>
@@ -194,7 +188,7 @@
 
       <!-- A4 -->
       <section id="a4" class="card">
-        <h2>A4 · Blend Images into a Mosaic</h2>
+        <h3>A4 · Blend Images into a Mosaic</h3>
         <p class="sub">Warp each image to a global canvas and feather-blend using soft alpha from EDT.</p>
 
         <div class="grid2">
@@ -220,11 +214,129 @@
       </section>
     </section>
 
-    <!-- B placeholder -->
+    <!-- B -->
     <section id="b" class="card">
-      <h2>Part B (coming soon)</h2>
-      <p class="sub">This section is reserved for Proj3B deliverables and will be added later.</p>
+      <h2>B · FEATURE MATCHING for AUTOSTITCHING</h2>
+      <p class="sub">
+        Following Brown et al. (MSOP, 2005). B.1: Harris + ANMS · B.2: 40→8 descriptors · B.3: Lowe ratio matching · B.4: 4-point RANSAC + mosaics.
+      </p>
+
+      <!-- B1 -->
+      <section id="b1" class="card">
+        <h3>B1 · Harris Corner Detection + ANMS</h3>
+        <p class="sub">
+          Detect Harris corners (single-scale), then apply Adaptive Non-Maximal Suppression (ANMS) to obtain a spatially uniform subset.
+        </p>
+        <div class="grid2">
+          <figure class="tile">
+            <img src="./b/results/b1/corners_no_anms.png" alt="Harris corners (no ANMS)" data-lightbox>
+            <figcaption><strong>Harris corners (no ANMS)</strong></figcaption>
+          </figure>
+          <figure class="tile">
+            <img src="./b/results/b1/corners_with_anms.png" alt="Harris corners with ANMS" data-lightbox>
+            <figcaption><strong>Harris + ANMS (N≈500)</strong></figcaption>
+          </figure>
+        </div>
+        <div class="note">
+          Corners are drawn directly onto the image pixels (OpenCV). ANMS uses the “stronger-by-ratio” radius (ratio≈1.11) and keeps top-N radii.
+        </div>
+      </section>
+
+      <!-- B2 -->
+      <section id="b2" class="card">
+        <h3>B2 · Feature Descriptor Extraction (40×40 → 8×8)</h3>
+        <p class="sub">
+          For each ANMS keypoint, sample a 40×40 gray patch, lightly blur, downsample to 8×8, then bias/gain normalize (z-score).
+          Descriptors are stored as 64-D row vectors (N×64).
+        </p>
+        <div class="grid2">
+          <figure class="tile">
+            <img src="./b/results/b2/building/right/locations_overlay.png" alt="Keypoints used for descriptors" data-lightbox>
+            <figcaption><strong>Keypoint locations used for descriptors</strong></figcaption>
+          </figure>
+          <figure class="tile">
+            <img src="./b/results/b2/building/right/patch_montage.png" alt="8×8 descriptor montage" data-lightbox>
+            <figcaption><strong>8×8 descriptor montage (sampled)</strong></figcaption>
+          </figure>
+        </div>
+        <div class="kv mono" style="margin:.75rem 0">
+          <b>descriptors.npy</b><span>shape = (N, 64) · float32</span>
+          <b>coords.npy</b><span>shape = (N, 2) = (y, x)</span>
+        </div>
+      </section>
+
+      <!-- B3 -->
+      <section id="b3" class="card">
+        <h3>B3 · Feature Matching (Lowe Ratio Test)</h3>
+        <p class="sub">
+          Compute pairwise distances in descriptor space. For each feature in image A, accept match to image B if <em>d<sub>1</sub>/d<sub>2</sub> &lt; ρ</em> (ρ≈0.7), optionally with mutual check.
+        </p>
+        <figure class="tile">
+          <img src="./b/results/b3/building/matches.jpg" alt="Side-by-side matches" data-lightbox>
+          <figcaption><strong>Side-by-side matches</strong> (random colors, capped by max_draw)</figcaption>
+        </figure>
+        <div class="kv mono" style="margin:.75rem 0">
+          <b>matches.npy</b><span>shape = (M, 2), rows are [idx_in_img1, idx_in_img2]</span>
+          <b>ratio</b><span>0.6–0.8 (0.7 default)</span>
+          <b>cross-check</b><span>optional, improves inlier rate</span>
+        </div>
+      </section>
+
+      <!-- B4 -->
+      <section id="b4" class="card">
+        <h3>B4 · 4-point RANSAC for Robust Homography + Mosaics</h3>
+        <p class="sub">
+          Estimate H (img2 → img1) via 4-point RANSAC with normalized DLT and reprojection error thresholding. Re-fit H on inliers, then warp &amp; feather-blend to get panoramas.
+        </p>
+        <div class="grid2">
+          <figure class="tile">
+            <img src="./b/results/b4/building/matches_inliers.jpg" alt="Inlier matches after RANSAC" data-lightbox>
+            <figcaption>
+              <strong>Inlier matches after RANSAC</strong><br>
+              <span style="color:#00aa00;">Green lines</span> show all inlier correspondences under the best homography, while
+              <span style="color:#cc0000;">red lines</span> highlight the 4-point sample that generated this best model.    
+            </figcaption>
+          </figure>
+          <figure class="tile">
+            <img src="./b/results/b4/building/mosaic_auto.jpg" alt="Automatic mosaic" data-lightbox>
+            <figcaption><strong>Automatic mosaic</strong> (RANSAC + warp + blend)</figcaption>
+          </figure>
+        </div>
+
+        <h4>Manual vs Automatic (Side-by-side)</h4>
+        <div class="grid2">
+          <figure class="tile">
+            <img src="./a/results/a4/set2/mosaic.png" alt="Manual mosaic (Part A H)" data-lightbox>
+            <figcaption><strong>Manual mosaic</strong> (Part A homography)</figcaption>
+          </figure>
+          <figure class="tile">
+            <img src="./b/results/b4/building/mosaic_auto.jpg" alt="Auto vs Manual comparison" data-lightbox>
+            <figcaption><strong>Auto mosaic</strong> </figcaption>
+          </figure>
+        </div>
+        <div class="grid2">
+          <figure class="tile">
+            <img src="./a/results/a4/set1/mosaic.png" alt="Manual mosaic (Part A H)" data-lightbox>
+            <figcaption><strong>Manual mosaic</strong> (Part A homography)</figcaption>
+          </figure>
+          <figure class="tile">
+            <img src="./b/results/b4/desk/mosaic_auto.jpg" alt="Auto vs Manual comparison" data-lightbox>
+            <figcaption><strong>Auto mosaic</strong></figcaption>
+          </figure>
+        </div>
+        <div class="grid2">
+          <figure class="tile">
+            <img src="./a/results/a4/set3/mosaic.png" alt="Manual mosaic (Part A H)" data-lightbox>
+            <figcaption><strong>Manual mosaic</strong> (Part A homography)</figcaption>
+          </figure>
+          <figure class="tile">
+            <img src="./b/results/b4/climbingwall/mosaic_auto.jpg" alt="Auto vs Manual comparison" data-lightbox>
+            <figcaption><strong>Auto mosaic</strong></figcaption>
+          </figure>
+        </div>
+      </section>
     </section>
+
 
     <div class="footer">
       by <a href="https://github.com/V1Zhang" target="_blank">V1Zhang</a>
