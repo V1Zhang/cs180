@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CS180 Proj4 · Neural Radiance Field</title>
+  <link rel="stylesheet" href="../styles.css">
+  <style>
+    /* minimal extras */
+    .kv { display:grid; grid-template-columns:auto 1fr; gap:.25rem .75rem; }
+    .kv b{white-space:nowrap}
+    .grid2 { display:grid; gap:1rem; grid-template-columns: 1fr 1fr; }
+    .img-sm { max-width: 960px }
+    .note { background:#f7f9ff; border:1px solid #dfe7ff; padding:.75rem; border-radius:.5rem; }
+    .warn { background:#fff6e5; border:1px solid #ffd79f; padding:.75rem; border-radius:.5rem; }
+    .code { background:#0b1020; color:#e6e6e6; padding:1rem; border-radius:.5rem; overflow:auto; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    table.csv { border-collapse: collapse; width:100%; font-variant-numeric: tabular-nums; }
+    table.csv th, table.csv td { border:1px solid #e6e6e6; padding:.4rem .5rem; text-align:right }
+    table.csv th { background:#f7f7f9; text-align:center }
+    .tabs .tab.is-disabled { opacity:.45; pointer-events:none; }
+    .interactive-view {
+      position: relative;
+      background: #000;
+      border-radius: .5rem;
+      overflow: hidden;
+      cursor: grab;
+      height: 400px;     /* 固定高度，你可以根据自己的图调整，比如 350 / 400 / 420 */
+    }
+
+    .interactive-view img {
+      width: 100%;
+      height: 100%;       /* 让图片填充固定高度 */
+      object-fit: cover;  /* 重要：防止比例不一致时拉伸变形 */
+      display: block;
+      pointer-events: none;
+    }
+
+    .interactive-view .hint {
+      position: absolute;
+      top: .75rem;       /* 往上挪 */
+      left: .75rem;
+      font-size: .8rem;
+      color: #eee;
+      background: rgba(0,0,0,.5);
+      padding: .3rem .6rem;
+      border-radius: .25rem;
+      pointer-events: none;  /* 不影响拖拽 */
+    }
+
+  </style>
+</head>
+<body>
+  <header class="hero">
+    <div class="hero__inner">
+      <h1>CS180 Proj4 · Neural Radiance Field!</h1>
+      <div class="meta">Nov 2025 · Weiyi Zhang</div>
+
+      <nav class="tabs" aria-label="Sections">
+        <a class="tab" href="#p0">Part 0 · Camera Calibration and 3D Scanning</a>
+        <a class="tab" href="#p1">Part 1 · Fit a Neural Field to a 2D Image</a>
+        <a class="tab" href="#p2">Part 2 · Fit a Neural Radiance Field from Multi-view Images</a>
+        <a class="tab" href="#p26">Part 2.6 · Training with My Own Data</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap">
+
+    <!-- Part 0 -->
+    <section id="p0" class="card">
+      <h2>Part 0 · Camera Calibration and 3D Scanning</h2>
+      <p class="sub">
+        We calibrate the camera and visualize all training views in <code>viser</code> as frustums to verify
+        intrinsic/extrinsic parameters and scene coverage.
+      </p>
+
+      <h3>Camera Frustums in Viser</h3>
+      <div class="interactive-view" id="viser-view">
+        <img id="viser-view-img" src="./panda/vis/1.png" alt="Interactive camera frustums view">
+        <div class="hint">Drag left/right or scroll to change view</div>
+      </div>
+
+      <div class="note">
+        You can drag and scroll to see different views. The frustums represent the camera positions and orientations
+      </div>
+    </section>
+
+    <!-- Part 1 -->
+    <section id="p1" class="card">
+      <h2>Part 1 · Fit a Neural Field to a 2D Image</h2>
+      <p class="sub">
+        Fit an MLP-based coordinate network to reconstruct 2D images from continuous pixel coordinates using positional encoding.
+      </p>
+
+      <h3>Model Architecture</h3>
+      <div class="kv mono">
+        <b>Backbone</b><span>Multi-Layer Perceptron</span>
+        <b>Layers</b><span>4</span>
+        <b>Width</b><span>128</span>
+        <b>Activation</b><span>ReLU(for hidden layer) & Sigmoid(for output layer)</span>
+        <b>Positional Encoding</b><span>10</span>
+        <b>Learning Rate</b><span>1e-2 with Adam</span>
+        <b>Loss Function</b><span>Mean Squared Error (MSE Loss)
+</span>
+      </div>
+
+      <h3>Training Progression · Provided Test Image</h3>
+      <div class="card-inner">
+        <div class="kv mono">
+          <b>Step</b><span id="train-step-label">0</span>
+        </div>
+
+        <figure class="tile">
+          <div class="grid2">
+            <div>
+              <img id="train-img-a" src="./part1/train_a/step_0000.png" alt="Run A at current step">
+              <figcaption class="mono">
+                <strong>Fox</strong><br>
+                PSNR: <span id="psnr-a-label">-- dB</span>
+              </figcaption>
+            </div>
+            <div>
+              <img id="train-img-b" src="./part1/train_b/step_0000.png" alt="Run B at current step">
+              <figcaption class="mono">
+                <strong>Bridge</strong><br>
+                PSNR: <span id="psnr-b-label">-- dB</span>
+              </figcaption>
+            </div>
+          </div>
+        </figure>
+
+        <div style="margin-top:0.75rem;">
+          <input
+            type="range"
+            id="train-slider"
+            min="0"
+            max="5"
+            value="0"
+            style="width:100%;"
+          >
+          <p class="sub">Drag the slider to see pictures in different training steps.</p>
+        </div>
+      </div>
+
+      <h3>Positional Encoding &amp; Width</h3>
+      <p class="sub">
+        Comparison across two max positional encoding frequencies and two network widths.
+      </p>
+      <div class="grid2">
+        <figure class="tile">
+          <img src="./part1_neural_field_2d/results/grid_L2_W64/grid_L2_W64_final.png" alt="Low PE, wide MLP" data-lightbox>
+          <figcaption><strong>L=2, Width=64</strong></figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./part1_neural_field_2d/results/grid_L2_W256/grid_L2_W256_final.png" alt="Low PE, narrow MLP" data-lightbox>
+          <figcaption><strong>L=2, Width=256</strong></figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./part1_neural_field_2d/results/grid_L10_W64/grid_L10_W64_final.png" alt="High PE, wide MLP" data-lightbox>
+          <figcaption><strong>L=10, Width=64</strong></figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./part1_neural_field_2d/results/grid_L10_W256/grid_L10_W256_final.png" alt="High PE, narrow MLP" data-lightbox>
+          <figcaption><strong>L=10, Width=256</strong></figcaption>
+        </figure>
+      </div>
+
+      <h3>PSNR Curve</h3>
+      <figure class="tile">
+        <img src="./part1_neural_field_2d/results/bridge_L10_W128/bridge_L10_W128_psnr.png" alt="PSNR curve for training on one image" data-lightbox class="img-sm" style="max-width: 600px;">
+        <figcaption>PSNR curve for training with my self-chosen image 'bridge'. with dimensions = 128, L = 10.</figcaption>
+      </figure>
+    </section>
+
+    <!-- Part 2 -->
+    <section id="p2" class="card">
+      <h2>Part 2 · Fit a Neural Radiance Field from Multi-view Images (Lego)</h2>
+      <p class="sub">
+        Implement a NeRF-style volumetric renderer for the Lego scene, including ray sampling, MLP-based density/color prediction,
+        and hierarchical rendering from calibrated multi-view images.
+      </p>
+
+      <h3>Implementation Overview</h3>
+      <ul class="nice-list">
+      <li>
+        <strong>Compute rays from the cameras</strong><br>
+        I generate pixel-aligned rays using my own <code>get_rays()</code> function.  
+        It first maps pixel coordinates into camera space via <code>pixel_to_camera()</code>,  
+        then transforms them into world coordinates using the camera-to-world matrix.  
+        Each ray consists of:
+        <ul class="sub-list">
+          <li><code>ray_o</code> – the camera center extracted from <code>c2w</code></li>
+          <li><code>ray_d</code> – a normalized direction pointing through the pixel</li>
+        </ul>
+      </li>
+
+      <li>
+        <strong>Sample points along each ray</strong><br>
+        I implement stratified sampling in <code>sample_along_rays()</code>.  
+        For each ray, I draw <code>N_samples</code> depth values between <code>near</code> and <code>far</code>.  
+        With perturbation enabled, samples are jittered within each interval to encourage anti-aliasing and reduce bias.  
+        The output is:
+        <ul class="sub-list">
+          <li><code>pts</code> – 3D sample points in world coordinates</li>
+          <li><code>deltas</code> – interval lengths used for volumetric integration</li>
+        </ul>
+      </li>
+
+      <li>
+        <strong>Predict color and density using an MLP</strong><br>
+        Each sample point is fed into my custom <code>NeRF</code> MLP.  
+        The network processes:
+        <ul class="sub-list">
+          <li>the 3D position of each point (with positional encoding)</li>
+          <li>the viewing direction for directional appearance effects</li>
+        </ul>
+        The MLP outputs:
+        <ul class="sub-list">
+          <li><code>σ</code> – volume density at each point</li>
+          <li><code>rgb</code> – view-dependent color prediction</li>
+        </ul>
+      </li>
+
+      <li>
+        <strong>Combine samples into the final pixel color</strong><br>
+        I implement volumetric rendering in <code>volume_render()</code>, following NeRF’s equation:
+        <ul class="sub-list">
+          <li>compute transmittance along the ray</li>
+          <li>accumulate colors weighted by opacity</li>
+          <li>produce a single RGB for each pixel</li>
+        </ul>
+      </li>
+    </ul>
+
+    <style>
+      .nice-list > li { margin-bottom: 0.9rem; line-height: 1.45; }
+      .sub-list { margin-top: .3rem; margin-bottom:.5rem; list-style-type: circle; }
+    </style>
+
+      <h3>Rays &amp; Samples Visualization</h3>
+      <div class="grid2">
+        <figure class="tile">
+          <div class="interactive-view" id="lego-rays-view">
+            <img
+              id="lego-rays-img"
+              src="./lego/vis/render/rays_with_cameras_1.png"
+              alt="Sample rays with camera frustums (interactive)"
+              draggable="false"
+            >
+            <div class="hint">Drag left/right or scroll to change view</div>
+          </div>
+        </figure>
+        <figure class="tile">
+          <img src="./lego/vis/ray_samples.png" alt="Sample points along rays" data-lightbox>
+        </figure>
+      </div>
+
+      <h3>Training Progression (Lego)</h3>
+      <div class="grid2">
+        <figure class="tile">
+          <img src="./lego/lego_val_0_gt.png" alt="Lego prediction at 1k iters" data-lightbox>
+          <figcaption><strong>Groundthruth</strong></figcaption>
+        </figure>
+        <figure class="tile">
+          <img
+            id="lego-train-img"
+            src="./lego/progress/iter_00200.png"
+            alt="Lego NeRF prediction (interactive)"
+            data-lightbox
+          >
+          <figcaption class="mono">
+            <strong>Iter <span id="lego-iter-label">200</span></strong><br>
+            Train PSNR: <span id="lego-train-psnr">--</span> dB ·
+            Val PSNR: <span id="lego-val-psnr">--</span> dB ·
+            Loss: <span id="lego-loss">--</span>
+          </figcaption>
+        </figure>
+      </div>
+
+      <div style="margin-top:0.75rem;">
+        <input
+          type="range"
+          id="lego-train-slider"
+          min="0"
+          max="9"
+          value="0"
+          style="width:100%;"
+        >
+        <p class="sub">Drag the slider to browse NeRF predictions at different iterations.</p>
+      </div>
+    </div>
+      <h3>Validation PSNR Curve</h3>
+      <figure class="tile">
+        <img src="./lego/lego_val_psnr.png" alt="PSNR curve on validation set" data-lightbox class="img-sm" style="max-width:450px; margin:auto;">
+        <figcaption><strong>PSNR</strong> · evaluated on held-out Lego views.</figcaption>
+      </figure>
+
+      <h3>Spherical Rendering Video</h3>
+      <figure class="tile">
+        <img src="./lego/lego_nerf.gif"
+            alt="Spherical Camera Path"
+            data-lightbox
+            style="max-width:450px; margin:auto;">
+      </figure>
+    </section>
+
+    <!-- Part 2.6 -->
+    <section id="p26" class="card">
+      <h2>Part 2.6 · Training NeRF with My Own Data</h2>
+
+      <h3>Novel View GIF</h3>
+      <figure class="tile">
+        <img src="./panda/panda.gif" alt="Novel views of my object" data-lightbox class="img-sm" style="max-width:450px; margin:auto;">
+        <figcaption><strong>Camera Orbit GIF</strong> · synthesized views circling the object.</figcaption>
+      </figure>
+
+      <h3>Code &amp; Hyperparameter Adjustments</h3>
+      <div class="note">
+        <h3>Hyperparameter Tuning</h3>
+        <p class="sub">
+          I experimented with several key NeRF hyperparameters to make the custom scene both stable and efficient to train.
+          First, I tightened the depth range to <strong>near = 0.001</strong> and <strong>far = 0.5</strong>, which better matches the
+          small physical scale of my capture and avoids wasting samples on empty space. I then swept the number of points sampled
+          along each ray (<em>n_samples</em>) over <strong>32</strong>, <strong>64</strong>, and <strong>128</strong>. With
+          <strong>32</strong> samples the reconstruction was noticeably noisy, while <strong>64</strong> samples produced sharp
+          geometry and clean colors; increasing to <strong>128</strong> slightly improved details but made training significantly
+          slower. Finally, I set the total number of optimization steps to <strong>5000</strong>, which was enough for the training
+          PSNR to saturate and for the rendered novel views to look visually consistent without overfitting.
+        </p>
+      </div>
+
+      <h3>Training Loss Curve</h3>
+      <figure class="tile">
+        <img src="./panda/panda_train_loss.png" alt="Training loss over iterations" data-lightbox class="img-sm" style="max-width:450px; margin:auto;">
+        <figcaption><strong>Loss vs Iterations</strong> · convergence of my-scene NeRF.</figcaption>
+      </figure>
+
+      <h3>Intermediate Renders</h3>
+      <div class="card-inner">
+        <div class="kv mono">
+          <b>Step</b><span id="panda-iter-label">1</span>
+        </div>
+
+        <div class="grid2">
+          <figure class="tile">
+            <img src="./panda/panda_val_0_gt.png" alt="Panda GT view" data-lightbox>
+            <figcaption><strong>Ground Truth</strong></figcaption>
+          </figure>
+
+          <figure class="tile">
+            <img
+              id="panda-train-img"
+              src="./panda/panda_val_5000.png"
+              alt="Panda NeRF prediction"
+              data-lightbox
+            >
+            <figcaption class="mono">
+              <strong>Prediction · step <span id="panda-iter-label-inline">1</span></strong>
+            </figcaption>
+          </figure>
+        </div>
+
+        <div style="margin-top:0.75rem;">
+          <input
+            type="range"
+            id="panda-train-slider"
+            min="0"
+            max="4"
+            value="0"
+            style="width:100%;"
+          >
+          <p class="sub">Drag the slider to browse NeRF reconstructions at different training steps.</p>
+        </div>
+      </div>
+      <h3>Summary</h3>
+
+        <p class="sub">
+          When I first started working on this, I really thought I could achieve something close to the Lego example. Later I realized this is far more difficult than I imagined. I feel like I’ve tried almost every possible combination at every stage, yet every step turned out to be way more sensitive and error-prone than expected.
+        </p>
+
+        <p class="sub">
+          During image capture, I tested all kinds of setups:<br>
+          • 6 tags as <code>calib_images</code> + 1 tag (same size) for <code>object_images</code><br>
+          • 6 tags as <code>calib_images</code> + 6 tags for <code>object_images</code><br>
+          • using the 6-tag <code>object_images</code> directly for calibration<br>
+          • trying a single large tag for calibration<br>
+          My conclusion: <b>larger tags work much better.</b> They’re more stable, easier to detect, and much less sensitive to lighting or background noise. Small tags get messed up by shadows, reflections, or noisy textures extremely easily.
+        </p>
+
+        <p class="sub">
+          I also hit a ton of issues while shooting photos. Later I realized the object’s distance doesn’t need to change at all; it’s the tag’s viewpoint that needs diversity, otherwise the pose solve becomes unstable. Downsampling is a must as well, because high-res noise makes detection much worse.
+        </p>
+
+        <p class="sub">
+          If possible, find a place with uniform lighting and a clean background. My desk has complicated wood grain patterns, so the detector kept hallucinating tag IDs that didn’t exist. On top of that, the desk sits between a lamp and a window, so I had to constantly avoid shadows and reflections. I basically spent the whole shooting process tiptoeing around these problems just to prevent PnP from exploding.
+        </p>
+
+        <p class="sub">
+          As for implementation details, the part that consumed the most time was visualization in Viser. My camera poses were always flipped or chaotic—sometimes all flipped in one direction (which can be fixed with a scale), sometimes half of them flipped and the other half not (which needs manual axis correction in code), and sometimes just totally inconsistent. In those cases, my final conclusion is simple: <b>the images are the problem.</b> Blurry shots, misdetected tags, or extreme viewing angles all lead to unstable pose estimation. That’s something I only understood after wrestling with it for days.
+        </p>
+
+        <p class="sub">
+          In the final rendering stage, I also ran into another big issue: because the captured viewpoints were too limited, NeRF didn’t have enough angular coverage. As a result, the rendered output had obvious artifacts—especially those “floating blurry layers” that look like ghost surfaces. Later I finally understood that this isn’t the model’s fault. If the training views don’t constrain the space enough, NeRF simply starts hallucinating. The less information you give it, the more it invents.
+        </p>
+
+        <p class="sub">
+          I kept trying until the last day of the deadline, but I still think the result is not good enough. I believe I will try again when I have time. If anyone sees this webpage and is willing to visit my GitHub to check my code and point out the areas I can optimize, I would be very grateful.
+        </p>
+
+
+   <div class="footer">
+      by <a href="https://github.com/V1Zhang" target="_blank">V1Zhang</a>
+    </div>
+  </main>
+
+  <!-- Lightbox -->
+  <div class="lightbox" id="lightbox" aria-hidden="true" role="dialog">
+    <img alt="" id="lb-img">
+    <video id="lb-video" controls></video>
+  </div>
+
+  <script>
+
+  // --- CSV renderer: render same-origin CSV to table; fallback to link on error ---
+  async function renderCSV(container) {
+    const url = container.getAttribute('data-csv');
+    const caption = container.getAttribute('data-caption') || '';
+    if (!url) return;
+    try {
+      const txt = await fetch(url, {cache:'no-store'}).then(r => r.text());
+      const lines = txt.trim().split(/\r?\n/).filter(l => !l.startsWith('#'));
+      if (!lines.length) throw new Error('empty');
+      const rows = lines.map(l => l.split(',').map(s => s.trim()));
+      const table = document.createElement('table'); table.className = 'csv';
+      if (caption) {
+        const cap = document.createElement('div');
+        cap.style.margin = '.25rem 0 .5rem';
+        cap.innerHTML = '<strong>'+caption+'</strong>';
+        container.appendChild(cap);
+      }
+      rows.forEach((r,i) => {
+        const tr = document.createElement('tr');
+        r.forEach((v,j) => {
+          const cell = document.createElement(i===0 && r.length>1 ? 'th':'td');
+          cell.textContent = v; tr.appendChild(cell);
+        });
+        table.appendChild(tr);
+      });
+      container.appendChild(table);
+    } catch(e) {
+      const a = document.createElement('a'); a.href = url; a.textContent = 'Open CSV'; container.appendChild(a);
+    }
+  }
+  document.querySelectorAll('[data-csv]').forEach(renderCSV);
+
+  // --- Lightbox ---
+  const lb = document.getElementById('lightbox');
+  const lbImg = document.getElementById('lb-img');
+  const lbVideo = document.getElementById('lb-video');
+
+  function openLightbox(el) {
+    const isVideo = el.tagName.toLowerCase()==='video' || (el.src && el.src.endsWith('.mp4'));
+    lb.classList.add('open');
+    if (isVideo) {
+      lbVideo.src = el.currentSrc || el.src;
+      lbVideo.style.display = 'block';
+      lbImg.style.display = 'none';
+    } else {
+      lbImg.src = el.src; lbImg.alt = el.alt || '';
+      lbImg.style.display = 'block';
+      lbVideo.style.display = 'none';
+    }
+    lb.setAttribute('aria-hidden','false');
+  }
+  function closeLightbox(){
+    lb.classList.remove('open');
+    lbImg.src=''; lbVideo.pause(); lbVideo.removeAttribute('src');
+    lb.setAttribute('aria-hidden','true');
+  }
+  document.addEventListener('click', e => {
+    const t = e.target;
+    if (t.matches('[data-lightbox]')) openLightbox(t);
+    else if (t.id === 'lightbox') closeLightbox();
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && lb.classList.contains('open')) closeLightbox();
+  });
+
+// =========================
+// Part 1 · 两张图片，一个滑块同步控制（分别读各自 JSON）
+// =========================
+(function setupTrainingWidget(){
+  const slider      = document.getElementById('train-slider');
+  const stepSpan    = document.getElementById('train-step-label');   // 显示迭代数
+  const imgA        = document.getElementById('train-img-a');
+  const imgB        = document.getElementById('train-img-b');
+  const psnrALabel  = document.getElementById('psnr-a-label');
+  const psnrBLabel  = document.getElementById('psnr-b-label');
+
+  if (!slider || !imgA || !imgB) return;
+
+  // 你准备的 7 个可视化 step（和图片一一对应）
+  const iters = [1, 50, 100, 300, 500, 1000, 2000];
+
+  const imgPathsA = [
+    './part1_neural_field_2d/results/fox_L10_W128/progress/iter_0001.png',
+    './part1_neural_field_2d/results/fox_L10_W128/progress/iter_0050.png',
+    './part1_neural_field_2d/results/fox_L10_W128/progress/iter_0100.png',
+    './part1_neural_field_2d/results/fox_L10_W128/progress/iter_0300.png',
+    './part1_neural_field_2d/results/fox_L10_W128/progress/iter_0500.png',
+    './part1_neural_field_2d/results/fox_L10_W128/progress/iter_1000.png',
+    './part1_neural_field_2d/results/fox_L10_W128/progress/iter_2000.png',
+  ];
+
+  const imgPathsB = imgPathsA.map(p => p.replace('fox', 'bridge'));
+
+  let metricsA = null;
+  let metricsB = null;
+
+  // 用 JSON 形式加载 metrics
+  Promise.all([
+    fetch('./part1_neural_field_2d/results/fox_L10_W128/metrics.json')
+      .then(r => r.ok ? r.json() : null)
+      .catch(() => null),
+    fetch('./part1_neural_field_2d/results/bridge_L10_W128/metrics.json')
+      .then(r => r.ok ? r.json() : null)
+      .catch(() => null),
+  ]).then(([mA, mB]) => {
+    metricsA = mA;
+    metricsB = mB;
+
+    slider.min = '0';
+    slider.max = String(imgPathsA.length - 1);
+    slider.value = slider.max;
+    updateUI(slider.value);
+  });
+
+  function updateUI(idx) {
+    idx = Number(idx);
+    const iter = iters[idx];
+
+    // 上面的 Step 文本
+    stepSpan.textContent = iter;
+
+    // 当前两张图
+    imgA.src = imgPathsA[idx];
+    imgB.src = imgPathsB[idx];
+
+    // 从 snapshots 数组中按 idx 直接取 psnr
+    const psnrA = metricsA && metricsA.snapshots ? metricsA.snapshots[idx]?.psnr : null;
+    const psnrB = metricsB && metricsB.snapshots ? metricsB.snapshots[idx]?.psnr : null;
+
+    psnrALabel.textContent = psnrA != null ? psnrA.toFixed(2) + ' dB' : '-- dB';
+    psnrBLabel.textContent = psnrB != null ? psnrB.toFixed(2) + ' dB' : '-- dB';
+  }
+
+  slider.addEventListener('input', e => updateUI(e.target.value));
+})();
+(function setupLegoRaysInteractiveView() {
+  const container = document.getElementById('lego-rays-view');
+  const img = document.getElementById('lego-rays-img');
+  if (!container || !img) return;
+
+  const frameCount = 6;
+  let currentFrame = 0;
+
+  // 根据帧号生成图片路径
+  function frameSrc(i) {
+    return `./lego/vis/render/rays_with_cameras_${i}.png`;
+  }
+
+  function updateFrame() {
+    img.src = frameSrc(currentFrame);
+  }
+
+  // 拖拽状态
+  let isDragging = false;
+  let lastX = 0;
+  const pixelsPerFrame = 5; // 鼠标移动多少像素切一帧，数值越小越敏感
+
+  container.addEventListener('pointerdown', (e) => {
+    isDragging = true;
+    lastX = e.clientX;
+    container.classList.add('dragging');
+    container.setPointerCapture(e.pointerId);
+  });
+
+  container.addEventListener('pointerup', (e) => {
+    isDragging = false;
+    container.classList.remove('dragging');
+    container.releasePointerCapture(e.pointerId);
+  });
+
+  container.addEventListener('pointerleave', () => {
+    isDragging = false;
+    container.classList.remove('dragging');
+  });
+
+  container.addEventListener('pointermove', (e) => {
+    if (!isDragging) return;
+    const dx = e.clientX - lastX;
+
+    if (Math.abs(dx) >= pixelsPerFrame) {
+      const step = Math.round(dx / pixelsPerFrame);
+
+      // 循环索引，保证 0..frameCount-1
+      currentFrame = (currentFrame + step) % frameCount;
+      if (currentFrame < 0) currentFrame += frameCount;
+
+      updateFrame();
+      lastX = e.clientX;
+    }
+  });
+
+  // 支持滚轮切换
+  container.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const dir = Math.sign(e.deltaY); // 向下滚为正，向上为负
+    currentFrame = (currentFrame + dir + frameCount) % frameCount;
+    updateFrame();
+  }, { passive: false });
+
+  // 初始帧
+  updateFrame();
+})();
+
+(function setupLegoTrainingProgress() {
+  const slider       = document.getElementById('lego-train-slider');
+  const img          = document.getElementById('lego-train-img');
+  const iterLabel    = document.getElementById('lego-iter-label');
+  const trainPsnrEl  = document.getElementById('lego-train-psnr');
+  const valPsnrEl    = document.getElementById('lego-val-psnr');
+  const lossEl       = document.getElementById('lego-loss');
+
+  if (!slider || !img) return;
+
+  // 你有哪些 iter 存了 preview 图，就写哪些
+  // 这里假设 save_every=200, n_iters=2000
+  const iters = [200, 400, 600, 800, 1000, 1200, 1400, 1600, 1800, 2000];
+
+  function imgPath(iter) {
+    // ./lego/progress/iter_00200.png 这种格式
+    const name = String(iter).padStart(5, '0');
+    return `./lego/progress/iter_${name}.png`;
+  }
+
+  let metrics = null;
+
+  function findMetric(iter) {
+    if (!metrics) return null;
+    return metrics.find(m => m.iter === iter) || null;
+  }
+
+  function updateUI(idx) {
+    idx = Number(idx);
+    const iter = iters[idx];
+
+    // 更新图片
+    img.src = imgPath(iter);
+
+    // 更新文本
+    iterLabel.textContent = iter;
+
+    const rec = findMetric(iter);
+    if (rec) {
+      const tp = typeof rec.train_psnr === 'number' ? rec.train_psnr : rec.train_psnr?.value;
+      const lp = typeof rec.loss === 'number' ? rec.loss : rec.loss?.value;
+      const vp = rec.val_psnr;
+
+      trainPsnrEl.textContent = tp != null ? tp.toFixed(2) : '--';
+      lossEl.textContent      = lp != null ? lp.toExponential(2) : '--';
+      valPsnrEl.textContent   = (vp != null && !Number.isNaN(vp)) ? vp.toFixed(2) : '--';
+    } else {
+      trainPsnrEl.textContent = '--';
+      lossEl.textContent      = '--';
+      valPsnrEl.textContent   = '--';
+    }
+  }
+
+  // 初始化：载入 metrics.json
+  fetch('./lego/metrics.json', { cache: 'no-store' })
+    .then(r => r.ok ? r.json() : Promise.reject(r.status))
+    .then(data => {
+      metrics = data;
+
+      // 设置 slider 范围：0..iters.length-1
+      slider.min = '0';
+      slider.max = String(iters.length - 1);
+
+      // 默认跳到最后一个 iter（或者你想默认 200 就设为 0）
+      slider.value = String(iters.length - 1);
+      updateUI(slider.value);
+    })
+    .catch(err => {
+      console.error('Failed to load lego/metrics.json:', err);
+      // 即便没 metrics，也能通过 slider 切图
+      slider.min = '0';
+      slider.max = String(iters.length - 1);
+      slider.value = '0';
+      updateUI(slider.value);
+    });
+
+  // 滑动时更新
+  slider.addEventListener('input', e => {
+    updateUI(e.target.value);
+  });
+})();
+
+(function setupViserInteractiveView() {
+  const container = document.getElementById('viser-view');
+  const img = document.getElementById('viser-view-img');
+  if (!container || !img) return;
+
+  const frameCount = 5;
+  let currentFrame = 1;
+
+  function frameSrc(i) {
+    return `./panda/vis/${i}.png`;
+  }
+
+  function updateFrame() {
+    img.src = frameSrc(currentFrame);
+  }
+
+  // === 拖拽 ===
+  let isDragging = false;
+  let lastX = 0;
+  const pixelsPerFrame = 5;
+
+  container.addEventListener('pointerdown', (e) => {
+    isDragging = true;
+    lastX = e.clientX;
+    container.setPointerCapture(e.pointerId);
+  });
+
+  container.addEventListener('pointerup', (e) => {
+    isDragging = false;
+    container.releasePointerCapture(e.pointerId);
+  });
+
+  container.addEventListener('pointerleave', () => {
+    isDragging = false;
+  });
+
+  container.addEventListener('pointermove', (e) => {
+    if (!isDragging) return;
+    const dx = e.clientX - lastX;
+
+    if (Math.abs(dx) >= pixelsPerFrame) {
+      const step = Math.round(dx / pixelsPerFrame);
+
+      // ⭐ 不循环：只做 clamp
+      currentFrame = Math.min(Math.max(currentFrame + step, 1), frameCount);
+
+      updateFrame();
+      lastX = e.clientX;
+    }
+  });
+
+  // === 滚轮 ===
+  container.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const dir = Math.sign(e.deltaY);
+
+    // ⭐ 不循环：只做 clamp
+    currentFrame = Math.min(Math.max(currentFrame + dir, 1), frameCount);
+
+    updateFrame();
+  }, { passive: false });
+
+  updateFrame();
+})();
+
+(function setupPandaTrainingProgress() {
+    const slider    = document.getElementById('panda-train-slider');
+    const img       = document.getElementById('panda-train-img');
+    const iterLabel = document.getElementById('panda-iter-label');
+    const iterLabelInline = document.getElementById('panda-iter-label-inline');
+
+    if (!slider || !img) return;
+
+
+    const steps = [400, 800, 1200, 1600, 2000, 2400, 2800, 3200, 3600, 4000, 4400, 4800, 5000];
+
+    function imgPath(step) {
+      return `./panda/progress/iter_${step.toString().padStart(5, '0')}.png`;
+    }
+
+    function updateUI(idx) {
+      idx = Number(idx);
+      const step = steps[idx];
+
+  
+      img.src = imgPath(step);
+
+      if (iterLabel) iterLabel.textContent = step;
+      if (iterLabelInline) iterLabelInline.textContent = step;
+    }
+
+    // 初始化 slider：0..steps.length-1
+    slider.min = '0';
+    slider.max = String(steps.length - 1);
+
+    // 默认展示最后一个 step（训练最晚的效果）
+    slider.value = String(steps.length - 1);
+    updateUI(slider.value);
+
+    // 监听滑动
+    slider.addEventListener('input', (e) => {
+      updateUI(e.target.value);
+    });
+  })();
+</script>
+
+</body>
+</html>
