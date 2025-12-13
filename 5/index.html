@@ -1,0 +1,1307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CS180 Proj5 · The Power of Diffusion Models</title>
+  <link rel="stylesheet" href="../styles.css">
+  <style>
+    .kv { display:grid; grid-template-columns:auto 1fr; gap:.25rem .75rem; }
+    .kv b{white-space:nowrap}
+    .grid2 { display:grid; gap:1rem; grid-template-columns: 1fr 1fr; }
+    .grid3 { display:grid; gap:1rem; grid-template-columns: repeat(3, 1fr); }
+    .img-sm { max-width: 960px }
+    .note { background:#f7f9ff; border:1px solid #dfe7ff; padding:.75rem; border-radius:.5rem; }
+    .warn { background:#fff6e5; border:1px solid #ffd79f; padding:.75rem; border-radius:.5rem; }
+    .code { background:#0b1020; color:#e6e6e6; padding:1rem; border-radius:.5rem; overflow:auto; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    table.csv { border-collapse: collapse; width:100%; font-variant-numeric: tabular-nums; }
+    table.csv th, table.csv td { border:1px solid #e6e6e6; padding:.4rem .5rem; text-align:right }
+    table.csv th { background:#f7f7f9; text-align:center }
+    .tabs .tab.is-disabled { opacity:.45; pointer-events:none; }
+    .interactive-view {
+      position: relative;
+      background: #000;
+      border-radius: .5rem;
+      overflow: hidden;
+      height: 400px;
+    }
+    .interactive-view img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      pointer-events: none;
+    }
+    .interactive-view .hint {
+      position: absolute;
+      top: .75rem;
+      left: .75rem;
+      font-size: .8rem;
+      color: #eee;
+      background: rgba(0,0,0,.5);
+      padding: .3rem .6rem;
+      border-radius: .25rem;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <header class="hero">
+    <div class="hero__inner">
+      <h1>CS180 Proj5 · The Power of Diffusion Models</h1>
+      <p>A: The Power of Diffusion Models!</p>
+      <p>B: Flow Matching from Scratch!</p>
+      <div class="meta">Nov 2025 · Weiyi Zhang</div>
+
+      <nav class="tabs" aria-label="Sections">
+        <a class="tab" href="#a">Part A · The Power of Diffusion Models!</a>
+        <a class="tab" href="#b">Part B · Flow Matching from Scratch!</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap">
+
+    <!-- Part 0 -->
+    <section id="a" class="card">
+      <h2>A: The Power of Diffusion Models!</h2>
+      <section id="p0" class="card">
+      <h3>Part 0 · Play with the Model using Your Own Text Prompts!</h3>
+      <p class="sub">
+        In this part, I create my own text prompts, use the course HuggingFace cluster to generate
+        4096-dim prompt embeddings (.pth), and then visualize a few generations using different
+        <code class="func">num_inference_steps</code>. I also fix a random seed that will be reused for all
+        subsequent parts.
+      </p>
+      <h4>Prompt List & Embeddings</h4>
+      <p> Example Prompt Embedding </p>
+      <pre class="code mono" style="white-space:pre-wrap;">
+          Key: a high quality photo
+          Shape: torch.Size([1, 77, 4096])
+          Value: tensor([[[-0.0423, -0.0605,  0.0012,  ..., -0.0445, -0.0551,  0.0456],
+                  [-0.0925,  0.0050, -0.0171,  ..., -0.0464,  0.0248, -0.1573],
+                  [-0.2024,  0.0070,  0.0139,  ..., -0.0425, -0.0241, -0.1090],
+                  ...,
+                  [ 0.0936,  0.3098, -0.1141,  ...,  0.1418, -0.2241,  0.2144],
+                  [ 0.0936,  0.3098, -0.1141,  ...,  0.1418, -0.2241,  0.2144],
+                  [ 0.0936,  0.3098, -0.1141,  ...,  0.1418, -0.2241,  0.2144]]],
+                dtype=torch.float16)
+      </pre>
+      <br><br>
+      <p class="sub">
+        <b>Seeds</b><span><code class="func"> seed = 48</code></span><br>
+        <b>Steps</b><span><code class="func"> num_inference_steps = 20, 50, 100</code></span>
+        <br><br>
+      </p>
+      <div class="kv mono">
+        <p class="sub"><b>Prompt 1: </b>a high quality photo of a corgi riding a skateboard in downtown Tokyo at night</p>
+      </div>
+      <div class="grid3">
+        <figure class="tile">
+          <img src="./outputs/part0/a high quality photo of a corgi riding a skateboard in downtown Tokyo at night_steps_20.png" alt="Prompt 1, 20 steps" data-lightbox>
+          <figcaption>20 steps</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part0/a high quality photo of a corgi riding a skateboard in downtown Tokyo at night_steps_50.png" alt="Prompt 1, 50 steps" data-lightbox>
+          <figcaption>50 steps</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part0/a high quality photo of a corgi riding a skateboard in downtown Tokyo at night_steps_100.png" alt="Prompt 1, 50 steps" data-lightbox>
+          <figcaption>100 steps</figcaption>
+        </figure>
+      </div>
+      <br><br>
+      <div class="kv mono">
+        <p class="sub"><b>Prompt 2: </b>a hyper-realistic portrait of an astronaut discovering an alien flower</p>
+      </div>
+      <div class="grid3">
+        <figure class="tile">
+          <img src="./outputs/part0/a hyper-realistic portrait of an astronaut discovering an alien flower_steps_20.png" alt="Prompt 2, 20 steps" data-lightbox>
+          <figcaption>20 steps</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part0/a hyper-realistic portrait of an astronaut discovering an alien flower_steps_50.png" alt="Prompt 2, 50 steps" data-lightbox>
+          <figcaption>50 steps</figcaption>
+        </figure>
+         <figure class="tile">
+          <img src="./outputs/part0/a hyper-realistic portrait of an astronaut discovering an alien flower_steps_100.png" alt="Prompt 2, 100 steps" data-lightbox>
+          <figcaption>100 steps</figcaption>
+        </figure>
+      </div>
+      <br><br>
+      <div class="kv mono">
+        <p class="sub"><b>Prompt 3: </b>a watercolor painting of the UC Berkeley campanile during golden hour</p>
+      </div>
+      <div class="grid3">
+        <figure class="tile">
+          <img src="./outputs/part0/a watercolor painting of the UC Berkeley campanile during golden hour_steps_20.png" alt="Prompt 3, 20 steps" data-lightbox>
+          <figcaption>20 steps</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part0/a watercolor painting of the UC Berkeley campanile during golden hour_steps_50.png" alt="Prompt 3, 75 steps" data-lightbox>
+          <figcaption>50 steps</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part0/a watercolor painting of the UC Berkeley campanile during golden hour_steps_100.png" alt="Prompt 3, 75 steps" data-lightbox>
+          <figcaption>100 steps</figcaption>
+        </figure>
+      </div>
+      <br><br>
+      <p class="sub">
+        Interestingly, the image quality does not improve monotonically with more denoising steps as I thought. 
+        <br>For <b>Prompt 1</b> (the corgi in downtown Tokyo), I think the the quality of different step images are similar.
+        <br>For <b>Prompt 2</b>, I think the <code class="func">100</code>-step sample captures the flower details most clearly. For <code class="func">20</code>-step, 
+        no idea what is that weird thing.
+        <br>For <b>Prompt 3</b> (UC Berkeley Campanile), I think the <code class="func">50</code>-step output again provides the best balance between structure 
+        and watercolor smoothness, whereas the <code class="func">25</code>-step version stresses Berkeley 
+        features and resembles a generic clock tower, and the <code class="func">100</code>-step version stresses 'golden hour'. 
+      </p>
+      </section>
+    
+
+    <!-- Part 1 · Forward, classical denoising, one-step -->
+    <section id="pA" class="card">
+      <h3>Part 1 · Sampling Loops</h3>
+
+        <h4>1.1 Implementing the Forward Process</h4>
+        <p class="sub">
+          I implement the forward step using the DDPM formula:
+        </p>
+
+        <div class="math">
+          $$x_t = \sqrt{\bar{\alpha}_t}\, x_0 + \sqrt{1 - \bar{\alpha}_t}\, \epsilon,
+          \qquad \epsilon \sim \mathcal{N}(0,1)$$
+        </div>
+
+        <p class="sub">
+          Here, <code class="func">alpha_bar[t]</code> is taken from <code class="func">alphas_cumprod</code>, and
+          <code class="func">noise ~ N(0,1)</code>. This produces a progressively noisier image as
+          <code class="func">t</code> increases.
+        </p>
+
+        <div class="grid4">
+        <figure class="tile">
+          <img src="./outputs/part1/forward_process/campanile_original.png" alt="Noisy Campanile at t=250" data-lightbox>
+          <figcaption>original</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/forward_process/campanile_t250.png" alt="Noisy Campanile at t=250" data-lightbox>
+          <figcaption>t = 250</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/forward_process/campanile_t500.png" alt="Noisy Campanile at t=500" data-lightbox>
+          <figcaption>t = 500</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/forward_process/campanile_t750.png" alt="Noisy Campanile at t=750" data-lightbox>
+          <figcaption>t = 750</figcaption>
+        </figure>
+      </div>
+
+      <h4>1.2 Classical Gaussian Denoising</h4>
+      <p class="sub">
+        I then try to denoise these images using Gaussian blur
+        (<code class="func">torchvision.transforms.functional.gaussian_blur</code>), tuning kernel size and
+        sigma by hand for each timestep.
+      </p>
+      <div class="grid3">
+        <figure class="tile">
+          <img src="./outputs/part1/gaussian_denoising/campanile_t250_noisy.png" alt="Gaussian blur at t=250" data-lightbox>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/gaussian_denoising/campanile_t500_noisy.png" alt="Gaussian blur at t=500" data-lightbox>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/gaussian_denoising/campanile_t750_noisy.png" alt="Gaussian blur at t=750" data-lightbox>
+        </figure>
+      </div>
+      <div class="grid3">
+        <figure class="tile">
+          <img src="./outputs/part1/gaussian_denoising/campanile_t250_gaussian.png" alt="Gaussian blur at t=250" data-lightbox>
+          <figcaption>t = 250</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/gaussian_denoising/campanile_t500_gaussian.png" alt="Gaussian blur at t=500" data-lightbox>
+          <figcaption>t = 500</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/gaussian_denoising/campanile_t750_gaussian.png" alt="Gaussian blur at t=750" data-lightbox>
+          <figcaption>t = 750</figcaption>
+        </figure>
+      </div>
+
+      <h4>1.3 One-Step Denoising with DeepFloyd</h4>
+      <p class="sub">
+        Using the pretrained <code class="func">stage_1.unet</code> conditioned on
+        <code class="func">"a high quality photo"</code>, I estimate the noise and reconstruct the clean image
+        in a single reverse step for each noisy input. Below I compare the original, the noisy,
+        and the one-step estimate.
+      </p>
+
+      <div class="grid3">
+        <figure class="tile">
+          <img src="./outputs/part1/one_step_denoising/campanile_t250_noisy.png" alt="One-step denoised Campanile at t=250" data-lightbox>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/one_step_denoising/campanile_t500_noisy.png" alt="One-step denoised Campanile at t=500" data-lightbox>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/one_step_denoising/campanile_t750_noisy.png" alt="One-step denoised Campanile at t=750" data-lightbox>
+        </figure>
+      </div>
+      <div class="grid3">
+        <figure class="tile">
+          <img src="./outputs/part1/one_step_denoising/campanile_t250_onestep.png" alt="One-step denoised Campanile at t=250" data-lightbox>
+          <figcaption>t = 250</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/one_step_denoising/campanile_t500_onestep.png" alt="One-step denoised Campanile at t=500" data-lightbox>
+          <figcaption>t = 500</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/one_step_denoising/campanile_t750_onestep.png" alt="One-step denoised Campanile at t=750" data-lightbox>
+          <figcaption>t = 750</figcaption>
+        </figure>
+      </div>
+
+      <p class="sub">
+        Compared to Gaussian blur, the diffusion model preserves much sharper edges and more
+        realistic textures, especially at higher noise levels where classical filtering severely
+        washes out the structure.
+      </p>
+
+      <h4>1.4 Iterative Denoising</h4>
+      <p class="sub">
+        I construct <code class="func">strided_timesteps</code> from 990 down to 0 with stride 30, call
+        <code class="func">stage_1.scheduler.set_timesteps</code>, and implement
+        <code class="func">iterative_denoise(im_noisy, i_start)</code>. Starting from the Campanile noised at
+        <code class="func">timestep[10]</code>, I show every 5th denoising step and compare the final estimate
+        against the one-step denoised and Gaussian result.
+      </p>
+
+      <h5>Intermediate Iterative Denoising (every 5th step)</h5>
+      <div class="grid5">
+        <figure class="tile">
+          <img src="./outputs/part1/iterative_denoising/campanile_iter_frame_00.png" alt="Iterative denoising step 0" data-lightbox>
+          <figcaption>Iterative Step 0 (noisiest)</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/iterative_denoising/campanile_iter_frame_05.png" alt="Iterative denoising step 5" data-lightbox>
+          <figcaption>Iterative Step 5</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/iterative_denoising/campanile_iter_frame_10.png" alt="Iterative denoising step 10" data-lightbox>
+          <figcaption>Iterative Step 10</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/iterative_denoising/campanile_iter_frame_15.png" alt="Iterative denoising step 15" data-lightbox>
+          <figcaption>Iterative Step 15</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/iterative_denoising/campanile_iter_frame_20.png" alt="Iterative denoising step 20" data-lightbox>
+          <figcaption>Iterative Step 20</figcaption>
+        </figure>
+      </div>
+
+      <h5>Final Comparison</h5>
+      <div class="grid4">
+        <figure class="tile">
+          <img src="./outputs/part1/iterative_denoising/campanile_original.png" alt="Iteratively denoised Campanile" data-lightbox>
+          <figcaption>Original Image</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/iterative_denoising/campanile_iterative_final.png" alt="Iteratively denoised Campanile" data-lightbox>
+          <figcaption>Iteratively Denoised</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/one_step_denoising/campanile_t750_onestep.png" alt="One-step denoised from same noise level" data-lightbox>
+          <figcaption>One-Step Denoised</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/gaussian_denoising/campanile_t750_gaussian.png" alt="Gaussian blur baseline" data-lightbox>
+          <figcaption>Gaussian Blur Baseline</figcaption>
+        </figure>
+      </div>
+
+      <h4>1.5 Unconditional Sampling from Noise</h4>
+      <p class="sub">
+        By setting <code class="func">i_start = 0</code> and initializing <code class="func">im_noisy</code> with Gaussian
+        noise, I can generate samples purely from the diffusion prior, conditioned only on
+        <code class="func">"a high quality photo"</code>.
+      </p>
+      <div class="grid5">
+        <figure class="tile">
+          <img src="./outputs/part1/sampling/sample_0.png" alt="Unconditional sample 1" data-lightbox>
+          <figcaption>Sample 1</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/sampling/sample_1.png" alt="Unconditional sample 2" data-lightbox>
+          <figcaption>Sample 2</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/sampling/sample_2.png" alt="Unconditional sample 3" data-lightbox>
+          <figcaption>Sample 3</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/sampling/sample_3.png" alt="Unconditional sample 4" data-lightbox>
+          <figcaption>Sample 4</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/sampling/sample_4.png" alt="Unconditional sample 5" data-lightbox>
+          <figcaption>Sample 5</figcaption>
+        </figure>
+      </div>
+
+      <h4>1.6 Classifier-Free Guidance (CFG)</h4>
+      <p class="sub">
+        I then implement <code class="func">iterative_denoise_cfg</code>, which runs the UNet twice (conditional
+        and unconditional) and combines the noise estimates with a guidance scale
+        <code class="func">w &gt; 1</code>. Below are five samples using CFG with the same text prompt.
+      </p>
+      <div class="grid5">
+        <figure class="tile">
+          <img src="./outputs/part1/cfg_sampling/cfg_sample_0.png" alt="CFG sample 1" data-lightbox>
+          <figcaption>CFG Sample 1</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/cfg_sampling/cfg_sample_1.png" alt="CFG sample 2" data-lightbox>
+          <figcaption>CFG Sample 2</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/cfg_sampling/cfg_sample_2.png" alt="CFG sample 3" data-lightbox>
+          <figcaption>CFG Sample 3</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/cfg_sampling/cfg_sample_3.png" alt="CFG sample 4" data-lightbox>
+          <figcaption>CFG Sample 4</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/cfg_sampling/cfg_sample_4.png" alt="CFG sample 5" data-lightbox>
+          <figcaption>CFG Sample 5</figcaption>
+        </figure>
+      </div>
+      <p class="sub">
+        With CFG turned on, the images become much more faithful to the text prompt, with stronger
+        semantic structure at the cost of reduced diversity.
+      </p>
+      <p class="sub">
+        During experimentation, I observed that diffusion models tend to generate human portraits even when the prompt does not explicitly specify people.
+        This occurs because phrases like “a high quality photo” introduce strong semantic priors learned from the training data, where high-quality images are disproportionately human-centered.
+      </p>
+      
+
+      <h4>1.7 · Image-to-Image Translation & Inpainting</h4>
+      <p class="sub">
+        Using the SDEdit-style procedure, I start from real (or hand-drawn) images, add noise to
+        a chosen level, and denoise them with CFG to project them back onto the natural image
+        manifold. I then extend this idea to inpainting, where a mask specifies which region is
+        allowed to change.
+      </p>
+      <p class="sub">
+        I apply <code class="func">iterative_denoise_cfg</code> to the Campanile image with different starting
+        indices <code class="func">i_start ∈ {1, 3, 5, 7, 10, 20}</code>, using the prompt
+        <code class="func">"a high quality photo"</code>.
+      </p>
+      <p class="sub">Campanile</p>
+      <div class="grid7">
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_basic/img1_i1_t960.png" alt="Campanile i_start=1" data-lightbox>
+          <figcaption>i_start = 1</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_basic/img1_i3_t900.png" alt="Campanile i_start=3" data-lightbox>
+          <figcaption>i_start = 3</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_basic/img1_i5_t840.png" alt="Campanile i_start=5" data-lightbox>
+          <figcaption>i_start = 5</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_basic/img1_i7_t780.png" alt="Campanile i_start=7" data-lightbox>
+          <figcaption>i_start = 7</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_basic/img1_i10_t690.png" alt="Campanile i_start=10" data-lightbox>
+          <figcaption>i_start = 10</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_basic/img1_i20_t390.png" alt="Campanile i_start=20" data-lightbox>
+          <figcaption>i_start = 20</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_basic/img1_orig.png" alt="Campanile i_start=20" data-lightbox>
+          <figcaption>original</figcaption>
+        </figure>
+      </div>
+      <br></br>
+      <p class="sub">A photo of a bus taken in San Francisco</p>
+      <div class="grid7">
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_basic/img2_i1_t960.png" alt="Campanile i_start=1" data-lightbox>
+          <figcaption>i_start = 1</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_basic/img2_i3_t900.png" alt="Campanile i_start=3" data-lightbox>
+          <figcaption>i_start = 3</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_basic/img2_i5_t840.png" alt="Campanile i_start=5" data-lightbox>
+          <figcaption>i_start = 5</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_basic/img2_i7_t780.png" alt="Campanile i_start=7" data-lightbox>
+          <figcaption>i_start = 7</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_basic/img2_i10_t690.png" alt="Campanile i_start=10" data-lightbox>
+          <figcaption>i_start = 10</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_basic/img2_i20_t390.png" alt="Campanile i_start=20" data-lightbox>
+          <figcaption>i_start = 20</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_basic/img2_orig.png" alt="Campanile i_start=20" data-lightbox>
+          <figcaption>original</figcaption>
+        </figure>
+      </div>
+      <br></br>
+      <p class="sub">The little yellow ducks in Victoria Harbour, Hong Kong</p>
+      <div class="grid7">
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_basic/img3_i1_t960.png" alt="Campanile i_start=1" data-lightbox>
+          <figcaption>i_start = 1</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_basic/img3_i3_t900.png" alt="Campanile i_start=3" data-lightbox>
+          <figcaption>i_start = 3</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_basic/img3_i5_t840.png" alt="Campanile i_start=5" data-lightbox>
+          <figcaption>i_start = 5</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_basic/img3_i7_t780.png" alt="Campanile i_start=7" data-lightbox>
+          <figcaption>i_start = 7</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_basic/img3_i10_t690.png" alt="Campanile i_start=10" data-lightbox>
+          <figcaption>i_start = 10</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_basic/img3_i20_t390.png" alt="Campanile i_start=20" data-lightbox>
+          <figcaption>i_start = 20</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_basic/img3_orig.png" alt="Campanile i_start=20" data-lightbox>
+          <figcaption>original</figcaption>
+        </figure>
+      </div>
+      <br></br>
+      <h4>1.7.1 · Editing Hand-Drawn and Web Images</h4>
+      <p class="sub">
+        I repeat the same SDEdit procedure on one web image and two hand-drawn sketches, again
+        varying ><code class="func">i_start</code> over the same set of values.
+      </p>
+
+      <p class="sub">Web picture: A cat with an orange on its head</p>
+      <div class="grid7">
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_handdrawn/handdraw1_sdedit_i1.png" alt="Web i_start=1" data-lightbox>
+          <figcaption>i_start = 1</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_handdrawn/handdraw1_sdedit_i3.png" alt="Web i_start=20" data-lightbox>
+          <figcaption>i_start = 3</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_handdrawn/handdraw1_sdedit_i5.png" alt="Web i_start=5" data-lightbox>
+          <figcaption>i_start = 5</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_handdrawn/handdraw1_sdedit_i7.png" alt="Web i_start=7" data-lightbox>
+          <figcaption>i_start = 7</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_handdrawn/handdraw1_sdedit_i10.png" alt="Web i_start=20" data-lightbox>
+          <figcaption>i_start = 10</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_handdrawn/handdraw1_sdedit_i20.png" alt="Web i_start=20" data-lightbox>
+          <figcaption>i_start = 20</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_handdrawn/handdraw1_original.png" alt="Original web image" data-lightbox>
+          <figcaption>original</figcaption>
+        </figure>
+      </div>
+      <br></br>
+      <p class="sub">Hand-Drawn 1</p>
+      <div class="grid7">
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_handdrawn/handdraw2_sdedit_i1.png" alt="Web i_start=1" data-lightbox>
+          <figcaption>i_start = 1</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_handdrawn/handdraw2_sdedit_i3.png" alt="Web i_start=20" data-lightbox>
+          <figcaption>i_start = 3</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_handdrawn/handdraw2_sdedit_i5.png" alt="Web i_start=5" data-lightbox>
+          <figcaption>i_start = 5</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_handdrawn/handdraw2_sdedit_i7.png" alt="Web i_start=7" data-lightbox>
+          <figcaption>i_start = 7</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_handdrawn/handdraw2_sdedit_i10.png" alt="Web i_start=20" data-lightbox>
+          <figcaption>i_start = 10</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_handdrawn/handdraw2_sdedit_i20.png" alt="Web i_start=20" data-lightbox>
+          <figcaption>i_start = 20</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_handdrawn/handdraw2_original.png" alt="Original web image" data-lightbox>
+          <figcaption>original</figcaption>
+        </figure>
+      </div>
+      <br></br>
+      <p class="sub">Hand-Drawn 2</p>
+      <div class="grid7">
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_handdrawn/handdraw3_sdedit_i1.png" alt="Web i_start=1" data-lightbox>
+          <figcaption>i_start = 1</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_handdrawn/handdraw3_sdedit_i3.png" alt="Web i_start=20" data-lightbox>
+          <figcaption>i_start = 3</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_handdrawn/handdraw3_sdedit_i5.png" alt="Web i_start=5" data-lightbox>
+          <figcaption>i_start = 5</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_handdrawn/handdraw3_sdedit_i7.png" alt="Web i_start=7" data-lightbox>
+          <figcaption>i_start = 7</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_handdrawn/handdraw3_sdedit_i10.png" alt="Web i_start=20" data-lightbox>
+          <figcaption>i_start = 10</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_handdrawn/handdraw3_sdedit_i20.png" alt="Web i_start=20" data-lightbox>
+          <figcaption>i_start = 20</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_handdrawn/handdraw3_original.png" alt="Original web image" data-lightbox>
+          <figcaption>original</figcaption>
+        </figure>
+      </div>
+      <p class="sub">
+        I first tried using a general prompt, which does not explicitly specify color or rendering style. 
+        As i_start increases, the diffusion process gradually deviates from the original hand-drawn input, 
+        but the outputs turn to portrait photo.
+
+        Then I tried to use low CFG_SCALE, then we can see there is no longer a strong tendency to be a portrait photo,
+        but they preserve a black-and-white or low-saturation appearance.
+
+        This behavior suggests that, when starting from a hand-drawn grayscale sketch, the model tends to 
+        prioritize structural consistency over introducing new color information, especially under generic prompts. 
+        Without strong color or style constraints, the diffusion model often defaults to line-dominant or 
+        desaturated outputs that are consistent with the input distribution.
+
+        To encourage colorization, I also experimented with a more descriptive prompt such as 
+        “a cute children’s book illustration of a cheerful orange fruit with tiny leaves, drawn in a playful watercolor style,” 
+        along with higher CFG scales. While increasing the CFG scale strengthened prompt adherence, the model still 
+        showed limited ability to inject rich colors, indicating that color information is harder to introduce 
+        when the editing process starts from a predominantly grayscale hand-drawn input.
+      </p>
+      <div class="grid7">
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_handdrawn/try_own/handdraw2_sdedit_i1.png" alt="Web i_start=1" data-lightbox>
+          <figcaption>i_start = 1</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_handdrawn/try_own/handdraw2_sdedit_i3.png" alt="Web i_start=20" data-lightbox>
+          <figcaption>i_start = 3</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_handdrawn/try_own/handdraw2_sdedit_i5.png" alt="Web i_start=5" data-lightbox>
+          <figcaption>i_start = 5</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_handdrawn/try_own/handdraw2_sdedit_i7.png" alt="Web i_start=7" data-lightbox>
+          <figcaption>i_start = 7</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_handdrawn/try_own/handdraw2_sdedit_i10.png" alt="Web i_start=20" data-lightbox>
+          <figcaption>i_start = 10</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_handdrawn/try_own/handdraw2_sdedit_i20.png" alt="Web i_start=20" data-lightbox>
+          <figcaption>i_start = 20</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_handdrawn/try_own/handdraw2_original.png" alt="Original web image" data-lightbox>
+          <figcaption>original</figcaption>
+        </figure>
+      </div>
+      <div class="grid7">
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_handdrawn/try/handdraw2_sdedit_i1.png" alt="Web i_start=1" data-lightbox>
+          <figcaption>i_start = 1</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_handdrawn/try/handdraw2_sdedit_i3.png" alt="Web i_start=20" data-lightbox>
+          <figcaption>i_start = 3</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_handdrawn/try/handdraw2_sdedit_i5.png" alt="Web i_start=5" data-lightbox>
+          <figcaption>i_start = 5</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_handdrawn/try/handdraw2_sdedit_i7.png" alt="Web i_start=7" data-lightbox>
+          <figcaption>i_start = 7</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_handdrawn/try/handdraw2_sdedit_i10.png" alt="Web i_start=20" data-lightbox>
+          <figcaption>i_start = 10</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_handdrawn/try/handdraw2_sdedit_i20.png" alt="Web i_start=20" data-lightbox>
+          <figcaption>i_start = 20</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_handdrawn/try/handdraw2_original.png" alt="Original web image" data-lightbox>
+          <figcaption>original</figcaption>
+        </figure>
+      </div>
+     
+      </div>
+      <br></br>
+      <h4>1.7.2 · Inpainting</h4>
+      <p class="sub">
+        I implement <code class="func">inpaint</code> by combining the noisy reconstruction with the original
+        image outside the mask at each diffusion step. Below I show the Campanile inpainting
+        result and two additional examples on my own images. I used the prompt <code class="func">"a high quality photo"</code>
+      </p>
+
+      <p class="sub">Campanile Inpainting</p>
+      <div class="grid4">
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_inpainting/campanile_original.png" alt="Original Campanile" data-lightbox>
+          <figcaption>Original Campanile</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_inpainting/campanile_mask.png" alt="Inpainting mask" data-lightbox>
+          <figcaption>Inpainting Mask</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_inpainting/campanile_original_mask_overlay.png" alt="Inpainting mask" data-lightbox>
+          <figcaption>Inpainting Mask</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_inpainting/campanile_inpaint_final.png" alt="Campanile inpainted" data-lightbox>
+          <figcaption>Campanile Inpainted</figcaption>
+        </figure>
+      </div>
+      <br></br>
+      <p class="sub">My Own Images 1[Irregular Region]: The sign of an ice cream shop shot at Santa Monica Beach</p>
+      <div class="grid4">
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_inpainting/sign_original.png" alt="Original Campanile" data-lightbox>
+          <figcaption>Original Sign</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_inpainting/sign_mask.png" alt="Inpainting mask" data-lightbox>
+          <figcaption>Inpainting Mask</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_inpainting/sign_original_mask_overlay.png" alt="Inpainting mask" data-lightbox>
+          <figcaption>Inpainting Mask</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_inpainting/sign_inpaint_final.png" alt="Campanile inpainted" data-lightbox>
+          <figcaption>Sign Inpainted</figcaption>
+        </figure>
+      </div>
+      <p class="sub">I redrew a small and irregular area. It seems that diffusion wanted to directly restore this area to the color of the sky.</p>
+      
+      <p class="sub">My Own Images 2 [Big Region]: The setting sun blocked by the house</p>
+      <div class="grid4">
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_inpainting/sunset_original.png" alt="Original Sunset" data-lightbox>
+          <figcaption>Original Sunset</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_inpainting/sunset_mask.png" alt="Inpainting mask" data-lightbox>
+          <figcaption>Inpainting Mask</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_inpainting/sunset_original_mask_overlay.png" alt="Inpainting mask" data-lightbox>
+          <figcaption>Inpainting Mask</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_inpainting/sunset_inpaint_final.png" alt="Campanile inpainted" data-lightbox>
+          <figcaption>Sunset Inpainted</figcaption>
+        </figure>
+      </div>
+      <p class="sub">This is the sunset I captured at my residence. Due to the obstruction of the buildings, it didn't look very good. However, to my surprise, diffusion helped me redraw the buildings into mountains.</p>
+      <br></br>
+      <h4>1.7.3 · Text-Conditional Image-to-Image Translation</h4>
+      <p class="sub">
+        Finally, I repeat the SDEdit procedure but change the conditioning prompt to one of my
+        custom prompts from Part 0. The resulting images gradually trade off between preserving
+        the original content and matching the new text. Here are the prompts I used and the results:
+      </p>
+      <p class="sub">Prompt 1: "a tall shimmering silver Christmas tree decorated with glowing white lights, crystal ornaments, and a bright star on top, elegant winter holiday atmosphere"</p>
+      <div class="grid7">
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_text/campanile_text_i2i_i1.png" alt="Campanile to rocket ship transformation" data-lightbox>
+          <figcaption>i=1</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_text/campanile_text_i2i_i3.png" alt="Campanile to rocket ship transformation" data-lightbox>
+          <figcaption>i=3</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_text/campanile_text_i2i_i5.png" alt="Campanile to rocket ship transformation" data-lightbox>
+          <figcaption>i=5</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_text/campanile_text_i2i_i7.png" alt="Campanile to rocket ship transformation" data-lightbox>
+          <figcaption>i=7</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_text/campanile_text_i2i_i10.png" alt="Campanile to rocket ship transformation" data-lightbox>
+          <figcaption>i=10</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_text/campanile_text_i2i_i20.png" alt="Campanile to rocket ship transformation" data-lightbox>
+          <figcaption>i=20</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_text/campanile_original.png" alt="Campanile to rocket ship transformation" data-lightbox>
+          <figcaption>original</figcaption>
+        </figure>
+      </div>
+      <br><br>
+      <p class="sub">Prompt 2: "a soft cinematic scene with the calm and wise atmosphere of an elderly white-haired wizard reminiscent of Dumbledore, with gentle magical lighting and a warm enchanted glow"</p>
+      <div class="grid7">
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_text/ice_cream_text_i2i_i1.png" alt="Campanile to rocket ship transformation" data-lightbox>
+          <figcaption>i=1</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_text/ice_cream_text_i2i_i3.png" alt="Campanile to rocket ship transformation" data-lightbox>
+          <figcaption>i=3</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_text/ice_cream_text_i2i_i5.png" alt="Campanile to rocket ship transformation" data-lightbox>
+          <figcaption>i=5</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_text/ice_cream_text_i2i_i7.png" alt="Campanile to rocket ship transformation" data-lightbox>
+          <figcaption>i=7</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_text/ice_cream_text_i2i_i10.png" alt="Campanile to rocket ship transformation" data-lightbox>
+          <figcaption>i=10</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_text/ice_cream_text_i2i_i20.png" alt="Campanile to rocket ship transformation" data-lightbox>
+          <figcaption>i=20</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_text/ice_cream_original.png" alt="Campanile to rocket ship transformation" data-lightbox>
+          <figcaption>original</figcaption>
+        </figure>
+      </div>
+      <br><br>
+      <p class="sub">Prompt 3: "a serene Icelandic seascape at dusk with a small boat crossing the dark Arctic waters beneath a vivid aurora borealis, cold atmospheric lighting"</p>
+      <div class="grid7">
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_text/sea_text_i2i_i1.png" alt="Campanile to rocket ship transformation" data-lightbox>
+          <figcaption>i=1</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_text/sea_text_i2i_i3.png" alt="Campanile to rocket ship transformation" data-lightbox>
+          <figcaption>i=3</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_text/sea_text_i2i_i5.png" alt="Campanile to rocket ship transformation" data-lightbox>
+          <figcaption>i=5</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_text/sea_text_i2i_i7.png" alt="Campanile to rocket ship transformation" data-lightbox>
+          <figcaption>i=7</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_text/sea_text_i2i_i10.png" alt="Campanile to rocket ship transformation" data-lightbox>
+          <figcaption>i=10</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_text/sea_text_i2i_i20.png" alt="Campanile to rocket ship transformation" data-lightbox>
+          <figcaption>i=20</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part1/image2image_text/sea_original.png" alt="Campanile to rocket ship transformation" data-lightbox>
+          <figcaption>original</figcaption>
+        </figure>
+      </div>
+      <br></br>
+      <h4>Part 1.8 · Visual Anagrams</h4>
+      <div class="note">
+        Reference & inspiration:
+        <a href="https://dangeng.github.io/visual_anagrams/" target="_blank" rel="noopener">
+          Visual Anagrams: Generating Multi-View Optical Illusions with Diffusion Models
+        </a>
+      </div>
+      <p class="sub">
+        I implement <code class="func">visual_anagrams</code>, which denoises an image using two different
+        prompts in opposite orientations, averages the noise estimates, and creates a single image
+        that looks like one concept upright and another concept when flipped upside down.
+      </p>
+
+      <p class="sub"><b>Implementation</b></p>
+        <p class="sub">
+          At each denoising step, I:
+        </p>
+        <ol class="sub">
+          <li>Run UNet on <code class="func">y_t</code> with prompt A to get noise estimate <code class="func">ε_A</code>.</li>
+          <li>Run UNet on <code class="func">flip(y_t)</code> with prompt B to get <code class="func">ε_B</code>, then flip it back.</li>
+          <li>Average the two estimates to obtain <code class="func">ε = (ε_A + flip⁻¹(ε_B)) / 2</code>.</li>
+          <li>Use <code class="func">ε</code> in the DDPM reverse step.</li>
+        </ol>
+
+      <div class="grid2-video">
+        <figure class="tile">
+          <video
+            src="./outputs/part1/visual_anagrams/visual_anagram_moon_butterfly.mov"
+            autoplay
+            muted
+            loop
+            playsinline
+            style="margin:0 auto; display:block;"
+            data-lightbox
+          ></video>
+          <!-- <img src="./outputs/part1/visual_anagrams/visual_anagram_moon_butterfly.png" alt="Visual anagram 1 upright" data-lightbox style="width: 50%";>
+          <figcaption>a luminous full moon surrounded by swirling clouds painted in ethereal watercolor</figcaption> -->
+        </figure>
+        <figure class="tile">
+          <video
+            src="./outputs/part1/visual_anagrams/visual_anagram_volcanic_phoenix.mov"
+            autoplay
+            muted
+            loop
+            playsinline
+            style="margin:0 auto; display:block;"
+            data-lightbox
+          ></video>
+        </figure>
+      </div>
+
+      <br></br>
+      <h4>Part 1.9 · Hybrid Images via Factorized Diffusion</h4>
+      <div class="note">
+        Reference & inspiration:
+        <a href="https://dangeng.github.io/visual_anagrams/" target="_blank" rel="noopener">
+          Visual Anagrams: Generating Multi-View Optical Illusions with Diffusion Models
+        </a>
+      </div>
+      <p class="sub">
+        I follow the Factorized Diffusion idea to create hybrid images: I denoise with
+        two different prompts, then combine low frequencies from one noise estimate with high
+        frequencies of the other (using Gaussian blur and a residual).
+      </p>
+
+      <p class="sub"><b>Hybrid Construction</b></p>
+        <p class="sub">
+          For prompts A and B, I compute noise estimates <code class="func">ε_A</code> and <code class="func">ε_B</code>.
+          Then:
+        </p>
+        <ul class="sub-list">
+          <li><code class="func">low_A = gaussian_blur(ε_A, ksize=33, sigma=2)</code></li>
+          <li><code class="func">high_B = ε_B - gaussian_blur(ε_B, ksize=33, sigma=2)</code></li>
+          <li><code class="func">ε_hybrid = low_A + high_B</code></li>
+        </ul>
+        <p class="sub">
+          I plug <code class="func">ε_hybrid</code> into the reverse diffusion update to obtain a single hybrid image.
+        </p>
+
+      <div class="grid2-video">
+        <figure class="tile">
+          <video
+            src="./outputs/part1/hybrid_images/hybrid_bear_ucb.mov"
+            autoplay
+            muted
+            loop
+            playsinline
+            style="margin:0 auto; display:block;"
+            data-lightbox
+          ></video>
+          <!-- <img src="./outputs/part1/hybrid_images/hybrid_bear_ucb.png" alt="Low-frequency view" data-lightbox style="width: 50%";>
+          <figcaption>
+            a photo of the UC Berkeley bear logo, a stylized bear head silhouette used as the Berkeley mascot, simple bold shape, centered composition <br></br>
+            a photo of the UC Berkeley campus, historic university buildings, walkways, trees, and open spaces, realistic campus scenery, natural lighting
+          </figcaption> -->
+        </figure>
+        <figure class="tile">
+          <video
+            src="./outputs/part1/hybrid_images/hybrid_wolf_forest.mov"
+            autoplay
+            muted
+            loop
+            playsinline
+            style="margin:0 auto; display:block;"
+            data-lightbox
+          ></video>
+          <!-- <img src="./outputs/part1/hybrid_images/hybrid_wolf_forest.png" alt="High-frequency view" data-lightbox style="width: 50%";>
+          <figcaption>
+            a photo of a wolf head silhouette, clean outline, front-facing shape, simple and iconic form <br></br>
+            a photo of a foggy forest, tall trees fading into mist, dense branches, atmospheric forest scenery  
+          </figcaption> -->
+        </figure>    
+      </div>
+    </section>
+    </section>
+
+    <section id="b" class="card">
+      <h2>B: Flow Matching from Scratch!</h2>
+
+      <!-- ================= Part 1: Single-Step Denoising UNet ================= -->
+      <section id="p0" class="card">
+        <h3>Part 1: Training a Single-Step Denoising UNet</h3>
+        <p class="sub">
+          I first implement an unconditional UNet and train it as a single-step
+          denoiser on MNIST. Given a noisy image \(x = x_0 + \sigma \varepsilon\)
+          with Gaussian noise level \(\sigma\), the model learns a mapping
+          \(f_\theta(x) \approx x_0\) by minimizing an L2 reconstruction loss.
+        </p>
+        <h4>1.1 Implementing the UNet</h4>
+        <figure class="tile">
+          <img src="./image/UnconditionalUnet.png" alt="Unconditional Unet" data-lightbox>
+        </figure>
+
+        <!-- 1.2 Noising process -->
+        <h4>1.2 Noising Process Visualization</h4>
+        <p class="sub">
+          For a fixed clean digit \(x_0\) I add Gaussian noise with different
+          standard deviations \(\sigma \in \{0, 0.2, 0.4, 0.6, 0.8, 1.0\}\) and
+          visualize how the digit gradually degrades into noise.
+        </p>
+        <figure class="tile">
+          <!-- TODO: 换成你自己的图片路径 -->
+          <img src="./outputs/part2/UnconditionalUNet/noising_examples.png"
+              alt="MNIST noising visualization for multiple sigma values"
+              data-lightbox>
+          <figcaption>
+            Noising process of a single MNIST digit for increasing noise
+            levels \(\sigma\). Larger \(\sigma\) leads to stronger corruption.
+          </figcaption>
+        </figure>
+
+        <!-- 1.2.1 training -->
+        <h4>1.2.1 Training the Denoiser</h4>
+        <p class="sub">
+          I train the UNet with hidden dimension \(D = 128\) on the MNIST training
+          set for 5 epochs. I use batch size 256, Adam optimizer with learning rate
+          \(1\times 10^{-4}\), and resample a random \(\sigma\) for each batch so the
+          network sees different noisy versions of the same digits across epochs.
+        </p>
+        <figure class="tile">
+            <img src="./outputs/part2/UnconditionalUNet/pure_noise_train_loss.png"
+                alt="Training loss curve for single-step denoiser" data-lightbox style="width: 50%">
+            <figcaption>
+              Training loss curve of the single-step denoiser over 5 epochs.
+            </figcaption>
+        </figure>
+        <div class="grid2">
+          <figure class="tile">
+            <img src="./outputs/part2/UnconditionalUNet/denoise_epoch1.png"
+                alt="Denoising results at epoch 1" data-lightbox>
+            <figcaption>Test-set denoising with \(\sigma = 0.5\) after epoch 1</figcaption>
+          </figure>
+          <figure class="tile">
+            <img src="./outputs/part2/UnconditionalUNet/denoise_epoch5.png"
+                alt="Denoising results at epoch 5" data-lightbox>
+            <figcaption>Test-set denoising with \(\sigma = 0.5\) after epoch 5 </figcaption>
+          </figure>
+        </div>
+
+        <!-- 1.2.2 OOD testing -->
+        <h4>1.2.2 Out-of-Distribution Noise Levels</h4>
+        <p class="sub">
+          The denoiser is trained on \(\sigma = 0.5\). I now test it on digits
+          corrupted by out-of-distribution noise levels, keeping the underlying
+          digit fixed and varying \(\sigma\).
+        </p>
+        <figure class="tile">
+          <img src="./outputs/part2/UnconditionalUNet/ood_vis.png"
+              alt="Denoising results for out-of-distribution sigma" data-lightbox>
+          <figcaption>
+            Denoising performance for \(\sigma \in \{0.1, 0.3, 0.7, 0.9\}\).
+            Performance degrades as the noise level moves further away from the
+            training setting.
+          </figcaption>
+        </figure>
+
+        <!-- 1.2.3 denoising pure noise -->
+        <h4>1.2.3 Denoising Pure Noise</h4>
+        <p class="sub">
+          I repeat the training procedure but now feed pure Gaussian noise
+          \(x \sim \mathcal{N}(0, I)\) as input and still ask the UNet to predict a
+          clean digit. The model converges to mapping random noise to blurry,
+          digit-like blobs that resemble “average” shapes over the dataset.
+        </p>
+        <figure class="tile">
+            <img src="./outputs/part2/UnconditionalUNet/train_loss_denoiser.png"
+                alt="Training loss when denoising pure noise" data-lightbox style="width: 80%">
+            <figcaption>
+              Training loss for the pure-noise denoiser.
+            </figcaption>
+        </figure>
+        <div class="grid2">
+          <figure class="tile">
+            <img src="./outputs/part2/UnconditionalUNet/pure_noise_epoch1.png"
+                alt="Generated digits from pure noise at epoch 1" data-lightbox>
+          </figure>
+          <figure class="tile">
+            <img src="./outputs/part2/UnconditionalUNet/pure_noise_epoch5.png"
+                alt="Generated digits from pure noise at epoch 5"
+                data-lightbox>
+          </figure>
+        </div>
+        <p class="sub">
+          <b>Pure-noise denoising behavior.</b> When the UNet is trained to map pure Gaussian noise directly to clean MNIST digits, 
+          the generated samples quickly converge to a few blurry, 
+          prototype-like digit shapes rather than diverse, sharp digits. 
+          Many outputs look very similar to each other and often resemble an “average” digit rather than a specific example from the dataset. <br></br>
+          <b>Why?</b>
+          This happens because, under an MSE loss, the network is effectively learning the conditional expectation of the training images given noise. 
+          Since the input is just random noise with no meaningful structure, 
+          the model learns to largely ignore the noise and regress toward the global centroid (or a small set of centroids) of the MNIST training distribution, 
+          leading to low-diversity, smoothed digit templates instead of varied realistic samples.
+        </p>
+      
+        <h3>Part 2: Training a Flow Matching Model</h3>
+        <p class="sub">
+          In the second part I switch to flow matching. Instead of directly
+          predicting a clean image, a time-conditioned UNet
+          \(f_\theta(x_t, t)\) predicts the velocity field that transports a
+          noisy sample from Gaussian noise towards the MNIST data manifold.
+        </p>
+
+        <!-- 2.1 time-conditioned UNet -->
+        <h4>2.1 Time-Conditioned UNet</h4>
+        <p class="sub">
+          I inject a scalar time \(t \in [0,1]\) into the UNet via two FCBlocks,
+          which modulate the bottleneck feature (“unflatten”) and the first
+          upsampling block (“up1”). The hidden dimension is set to \(D = 64\).
+          The time scalar is normalized to [0, 1] before being embedded.
+        </p>
+        <figure class="tile">
+          <img src="./image/ConditionedUnet.png"
+              alt="Architecture diagram for time-conditioned UNet" data-lightbox>
+          <figcaption>
+            Time-conditioned UNet. Two FCBlocks generate scale features
+            that modulate intermediate activations based on the current time \(t\).
+          </figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="./image/algo1.png"
+                alt="algo1" data-lightbox style ="width: 80%">
+        </figure>
+        <figure class="tile">
+          <img src="./image/algo2.png"
+                alt="algo2" data-lightbox style ="width: 80%">
+        </figure>
+
+        <!-- 2.2 training time-conditioned -->
+        <h4>2.2 Training the Time-Conditioned UNet</h4>
+        
+        <p class="sub">
+          For each step, I sample a training image \(x_1\), a time
+          \(t \sim \mathcal{U}(0, 1)\), construct an interpolated sample
+          \(x_t = (1 - t) x_0 + t x_1\), and compute the target flow
+          \(v_t(x_t) = x_1 - x_0\). The UNet is trained to minimize
+          \(\|f_\theta(x_t, t) - v_t(x_t)\|^2\) with Adam (lr \(= 1 \times 10^{-4}\))
+          and an exponential LR scheduler with \(\gamma = 0.1\).
+        </p>
+        <figure class="tile">
+          <img src="./outputs/part2/TimeConditionalUNet/timecond_train_loss.png"
+              alt="Training loss for time-conditioned flow-matching UNet"
+              data-lightbox style ="width: 80%">
+          <figcaption>
+            Training loss curve for the time-conditioned UNet.
+          </figcaption>
+        </figure>
+
+        <!-- 2.3 sampling time-only -->
+        <h4>2.3 Sampling from the Time-Conditioned UNet</h4>
+        <p class="sub">
+          To sample, I start from pure noise \(x_{t=0} \sim \mathcal{N}(0, I)\)
+          and integrate the learned vector field forward in time using a fixed grid
+          of timesteps. After 1, 5, and 10 epochs, recognizable digits gradually
+          emerge.
+        </p>
+        
+        <figure class="tile">
+          <img src="./outputs/part2/TimeConditionalUNet/time_unet_samples_epoch1_N40.png"
+              alt="Flow-matching samples after 1 epochs" data-lightbox style="width: 80%">
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part2/TimeConditionalUNet/time_unet_samples_epoch5_N40.png"
+              alt="Flow-matching samples after 5 epochs" data-lightbox style="width: 80%">
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part2/TimeConditionalUNet/time_unet_samples_epoch10_N40.png"
+              alt="Flow-matching samples after 10 epochs" data-lightbox style="width: 80%">
+        </figure>
+        
+
+        <h3>Part 2: Class-Conditioned Flow Matching</h3>
+        <p class="sub">
+          To improve sample quality and gain control over which digit is generated,
+          I extend the UNet with class conditioning. A one-hot vector
+          \(\mathbf{c} \in \mathbb{R}^{10}\) encodes the digit label and modulates
+          the same layers as the time embedding via additional FCBlocks.
+          Classifier-free guidance is implemented by randomly dropping the class
+          vector 10% of the time during training.
+        </p>
+
+        <h4>2.4 Adding Class-Conditioning to UNet</h4>
+        <p class="sub">
+          Training follows the same flow-matching objective as before, but now the
+          UNet also receives the class embedding. I keep the same optimizer and
+          learning-rate schedule as for the time-only model.
+        </p>
+        <div class="grid2"></div>
+          <figure class="tile">
+            <img src="./image/algo1.png"
+                alt="algo1" data-lightbox style ="width: 80%">
+          <figcaption>Algorithm for training time-conditioned UNet</figcaption>
+          <figure class="tile">
+            <img src="./image/algo2.png"
+                alt="algo2" data-lightbox style ="width: 80%">
+          <figcaption>Iterative denoising algorithm for generation</figcaption>
+        </div>
+
+        <h4>2.5 Training the UNet</h4>
+        <figure class="tile">
+          <img src="./outputs/part2/ClassConditionalUNet/sched/classcond_train_loss.png"
+              alt="Training loss curve for class-conditioned UNet"
+              data-lightbox style ="width: 80%">
+          <figcaption>
+            Figure B.10: Training loss curve for the class-conditioned UNet.
+          </figcaption>
+        </figure>
+
+        <!-- 2.6 sampling class-conditioned -->
+        <h4>2.6 Class-Conditioned Sampling</h4>
+        <p class="sub">
+          During sampling I use classifier-free guidance with a guidance scale
+          \(\gamma\). For each digit \(y \in \{0, \dots, 9\}\) I generate four
+          independent samples. Compared to the time-only model, digits are sharper
+          and modes are better separated.
+        </p>
+        
+        <figure class="tile">
+          <img src="./outputs/part2/ClassConditionalUNet/sched/class_unet_samples_epoch1_N40.png"
+              alt="Flow-matching samples after 1 epochs" data-lightbox style="width: 80%">
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part2/ClassConditionalUNet/sched/class_unet_samples_epoch5_N40.png"
+              alt="Flow-matching samples after 5 epochs" data-lightbox style="width: 80%">
+        </figure>
+        <figure class="tile">
+          <img src="./outputs/part2/ClassConditionalUNet/sched/class_unet_samples_epoch10_N40.png"
+              alt="Flow-matching samples after 10 epochs" data-lightbox style="width: 80%"> 
+        </figure>
+
+        <!-- Scheduler ablation -->
+        <h4>Learning Rate Scheduler Ablation</h4>
+        <p class="sub">
+          I also trained the class-conditioned model without the exponential learning
+          rate scheduler. To compensate, I reduced the initial learning rate to
+          \(1 \times 10^{-3}\) and trained for more epochs. This keeps the
+          optimization stable while still allowing the model to converge. The final
+          samples are slightly blurrier but qualitatively similar to the version
+          with the scheduler.
+        </p>
+        
+        <div class="grid2">
+          <figure class="tile">
+            <img src="./outputs/part2/ClassConditionalUNet/sched/class_unet_samples_epoch10_N40.png"
+                alt="Training loss without LR scheduler" data-lightbox>
+            <figcaption>
+              with LR scheduler.
+            </figcaption>
+          </figure>
+          <figure class="tile">
+            <img src="./outputs/part2/ClassConditionalUNet/no_sched/class_unet_samples_epoch10_N40.png"
+                alt="Samples from model trained without scheduler" data-lightbox>
+            <figcaption>
+              without LR scheduler.
+            </figcaption>
+          </figure>
+        </div>
+        <figure class="tile">
+            <img src="./outputs/part2/ClassConditionalUNet/lr_scheduler_comparison.png"
+                alt="Training loss without LR scheduler" data-lightbox>
+          </figure>
+      </section>
+
+
+    <div class="footer">
+      by <a href="https://github.com/V1Zhang" target="_blank">V1Zhang</a>
+    </div>
+  </main>
+
+  <!-- Lightbox -->
+  <div class="lightbox" id="lightbox" aria-hidden="true" role="dialog">
+    <img alt="" id="lb-img">
+    <video id="lb-video" controls></video>
+  </div>
+  
+  <script>
+  // --- Lightbox ---
+  const lb = document.getElementById('lightbox');
+  const lbImg = document.getElementById('lb-img');
+  const lbVideo = document.getElementById('lb-video');
+
+  function openLightbox(el) {
+    const isVideo = el.tagName.toLowerCase()==='video' || (el.src && el.src.endsWith('.mp4'));
+    lb.classList.add('open');
+    if (isVideo) {
+      lbVideo.src = el.currentSrc || el.src;
+      lbVideo.style.display = 'block';
+      lbImg.style.display = 'none';
+    } else {
+      lbImg.src = el.src; lbImg.alt = el.alt || '';
+      lbImg.style.display = 'block';
+      lbVideo.style.display = 'none';
+    }
+    lb.setAttribute('aria-hidden','false');
+  }
+  function closeLightbox(){
+    lb.classList.remove('open');
+    lbImg.src=''; lbVideo.pause(); lbVideo.removeAttribute('src');
+    lb.setAttribute('aria-hidden','true');
+  }
+  document.addEventListener('click', e => {
+    const t = e.target;
+    if (t.matches('[data-lightbox]')) openLightbox(t);
+    else if (t.id === 'lightbox') closeLightbox();
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && lb.classList.contains('open')) closeLightbox();
+  });
+  
+  </script>
+</body>
+</html>
